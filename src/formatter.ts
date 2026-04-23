@@ -21,6 +21,37 @@ export function buildSummary(entries: GameEntry[]): string {
   return `Found ${total} NSP links across ${sourceCount} sources:\n  ${breakdown}`;
 }
 
+export function formatSearchResults(entries: GameEntry[], query: string, errors: string[]): string {
+  if (entries.length === 0) {
+    const parts: string[] = [`No games found matching '${query}'.`];
+    if (errors.length > 0) {
+      parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
+    }
+    return parts.join('\n');
+  }
+
+  const table = new Table({
+    head: ['#', 'Game Name', 'Source', 'Download URL'],
+  });
+
+  for (const entry of entries) {
+    table.push([
+      entry.index,
+      truncate(entry.gameName, 50),
+      entry.sourceName,
+      truncate(entry.downloadUrl, 80),
+    ]);
+  }
+
+  const parts: string[] = [`Found ${entries.length} result(s) for '${query}':`, '', table.toString()];
+
+  if (errors.length > 0) {
+    parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
+  }
+
+  return parts.join('\n');
+}
+
 export function formatResults(entries: GameEntry[], errors: string[]): string {
   if (entries.length === 0) {
     const parts: string[] = ['No .nsp files were found on any source.'];
