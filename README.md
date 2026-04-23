@@ -1,2 +1,2 @@
 # rom-scraper
-Scrapes various sites for rom files
+Scrapes various sites for nsp files
