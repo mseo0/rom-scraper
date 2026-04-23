@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FetchResult } from '../../src/types';
+import { FetchResult, DetailPageResult } from '../../src/types';
 import { TARGET_SOURCES } from '../../src/sources';
 import { formatResults } from '../../src/formatter';
 
@@ -7,10 +7,11 @@ import { formatResults } from '../../src/formatter';
 vi.mock('../../src/fetcher');
 vi.mock('../../src/progress');
 
-import { fetchSource } from '../../src/fetcher';
+import { fetchSource, fetchDetailPages } from '../../src/fetcher';
 import { scrapeAll } from '../../src/orchestrator';
 
 const mockedFetch = vi.mocked(fetchSource);
+const mockedFetchDetailPages = vi.mocked(fetchDetailPages);
 
 /**
  * Build simple HTML containing .nsp links for a given source.
@@ -44,11 +45,40 @@ const sourceHtml: Record<string, string> = {
   Romenix: `<html><body>
     <a href="https://romenix.example.com/fire-emblem-engage.nsp">Fire Emblem Engage</a>
   </body></html>`,
+
+  NspGameHub: `<html><body>
+    <a href="https://nspgamehub.com/game/astral-chain">Astral Chain</a>
+    <a href="https://nspgamehub.com/game/xenoblade-de">Xenoblade DE</a>
+  </body></html>`,
+};
+
+/** Detail page HTML for NspGameHub deep-link source */
+const nspGameHubDetailPages: Record<string, string> = {
+  'https://nspgamehub.com/game/astral-chain': `<html><head><title>Astral Chain</title></head><body>
+    <h1>Astral Chain</h1>
+    <a href="https://dl.nspgamehub.com/astral-chain.nsp">Download</a>
+  </body></html>`,
+  'https://nspgamehub.com/game/xenoblade-de': `<html><head><title>Xenoblade DE</title></head><body>
+    <h1>Xenoblade DE</h1>
+    <a href="https://dl.nspgamehub.com/xenoblade-de.nsp">Download</a>
+  </body></html>`,
 };
 
 describe('Full Pipeline Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock fetchDetailPages for the NspGameHub deep-link source
+    mockedFetchDetailPages.mockImplementation(async (gameLinks) => {
+      return gameLinks.map((gl) => {
+        const html = nspGameHubDetailPages[gl.url] ?? null;
+        return {
+          gameLink: gl,
+          html,
+          error: html ? null : `Failed to fetch ${gl.url}`,
+        } as DetailPageResult;
+      });
+    });
   });
 
   it('should scrape all 6 sources, parse entries, assign indices, and format output', async () => {
@@ -62,21 +92,22 @@ describe('Full Pipeline Integration', () => {
 
     const { entries, errors } = await scrapeAll(TARGET_SOURCES);
 
-    // All 6 sources succeed — no errors
+    // All 7 sources succeed — no errors
     expect(errors).toHaveLength(0);
 
-    // Total entries: FMHY(2) + Retrogrados(1) + SwitchRom(2) + NSWTL(1) + SwitchRomsOrg(3) + Romenix(1) = 10
-    expect(entries).toHaveLength(10);
+    // Total entries: FMHY(2) + Retrogrados(1) + SwitchRom(2) + NSWTL(1) + SwitchRomsOrg(3) + Romenix(1) + NspGameHub(2) = 12
+    expect(entries).toHaveLength(12);
 
-    // Verify all 6 sources are represented
+    // Verify all 7 sources are represented
     const sourceNames = new Set(entries.map((e) => e.sourceName));
-    expect(sourceNames.size).toBe(6);
+    expect(sourceNames.size).toBe(7);
     expect(sourceNames).toContain('FMHY');
     expect(sourceNames).toContain('RetrogradosGaming');
     expect(sourceNames).toContain('SwitchRom');
     expect(sourceNames).toContain('NSWTL');
     expect(sourceNames).toContain('SwitchRomsOrg');
     expect(sourceNames).toContain('Romenix');
+    expect(sourceNames).toContain('NspGameHub');
 
     // Verify sequential indices are assigned (1-based)
     entries.forEach((entry, i) => {
@@ -100,6 +131,8 @@ describe('Full Pipeline Integration', () => {
     expect(gameNames).toContain('Pokemon Scarlet');
     expect(gameNames).toContain('Kirby Forgotten Land');
     expect(gameNames).toContain('Fire Emblem Engage');
+    expect(gameNames).toContain('Astral Chain');
+    expect(gameNames).toContain('Xenoblade DE');
   });
 
   it('should produce valid formatted output with summary and table', async () => {
@@ -112,7 +145,7 @@ describe('Full Pipeline Integration', () => {
     const output = formatResults(entries, errors);
 
     // Summary line shows correct total
-    expect(output).toContain('Found 10 NSP links across 6 sources');
+    expect(output).toContain('Found 12 NSP links across 7 sources');
 
     // Per-source breakdown
     expect(output).toContain('FMHY: 2');
@@ -121,6 +154,7 @@ describe('Full Pipeline Integration', () => {
     expect(output).toContain('NSWTL: 1');
     expect(output).toContain('SwitchRomsOrg: 3');
     expect(output).toContain('Romenix: 1');
+    expect(output).toContain('NspGameHub: 2');
 
     // Table contains game names
     expect(output).toContain('Zelda TOTK');
@@ -129,6 +163,8 @@ describe('Full Pipeline Integration', () => {
     expect(output).toContain('Pokemon Scarlet');
     expect(output).toContain('Kirby Forgotten Land');
     expect(output).toContain('Fire Emblem Engage');
+    expect(output).toContain('Astral Chain');
+    expect(output).toContain('Xenoblade DE');
 
     // Table contains download URLs
     expect(output).toContain('zelda-totk.nsp');
@@ -152,7 +188,7 @@ describe('Full Pipeline Integration', () => {
 
     await scrapeAll(TARGET_SOURCES);
 
-    expect(mockedFetch).toHaveBeenCalledTimes(6);
+    expect(mockedFetch).toHaveBeenCalledTimes(7);
 
     // Verify each source was fetched
     const fetchedUrls = mockedFetch.mock.calls.map((call) => call[0].url);

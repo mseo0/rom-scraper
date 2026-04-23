@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FetchResult } from '../../src/types';
+import { FetchResult, DetailPageResult } from '../../src/types';
 import { TARGET_SOURCES } from '../../src/sources';
 
 // Mock only the fetcher and progress — parsers, formatter, orchestrator, and search run for real
 vi.mock('../../src/fetcher');
 vi.mock('../../src/progress');
 
-import { fetchSource } from '../../src/fetcher';
+import { fetchSource, fetchDetailPages } from '../../src/fetcher';
 import { scrapeAll } from '../../src/orchestrator';
 import { searchGames } from '../../src/search';
 import { formatSearchResults } from '../../src/formatter';
 
 const mockedFetch = vi.mocked(fetchSource);
+const mockedFetchDetailPages = vi.mocked(fetchDetailPages);
 
 /**
  * Predefined HTML for each source, reusing the same fixture data
@@ -45,6 +46,18 @@ const sourceHtml: Record<string, string> = {
   Romenix: `<html><body>
     <a href="https://romenix.example.com/fire-emblem-engage.nsp">Fire Emblem Engage</a>
   </body></html>`,
+
+  NspGameHub: `<html><body>
+    <a href="https://nspgamehub.com/game/astral-chain">Astral Chain</a>
+  </body></html>`,
+};
+
+/** Detail page HTML for NspGameHub deep-link source */
+const nspGameHubDetailPages: Record<string, string> = {
+  'https://nspgamehub.com/game/astral-chain': `<html><head><title>Astral Chain</title></head><body>
+    <h1>Astral Chain</h1>
+    <a href="https://dl.nspgamehub.com/astral-chain.nsp">Download</a>
+  </body></html>`,
 };
 
 function setupFetchMock() {
@@ -61,6 +74,18 @@ function setupFetchMock() {
 describe('Search Pipeline Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock fetchDetailPages for the NspGameHub deep-link source
+    mockedFetchDetailPages.mockImplementation(async (gameLinks) => {
+      return gameLinks.map((gl) => {
+        const html = nspGameHubDetailPages[gl.url] ?? null;
+        return {
+          gameLink: gl,
+          html,
+          error: html ? null : `Failed to fetch ${gl.url}`,
+        } as DetailPageResult;
+      });
+    });
   });
 
   it('should filter results to only matching entries for a search query', async () => {

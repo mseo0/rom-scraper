@@ -1,10 +1,19 @@
-import { Source, GameEntry, ParseResult } from './types';
+import { Source, GameEntry, ParseResult, DeepLinkParser } from './types';
 import { parseFmhy } from './parsers/fmhy';
 import { parseRetrogrados } from './parsers/retrogrados';
 import { parseSwitchrom } from './parsers/switchrom';
 import { parseNswtl } from './parsers/nswtl';
 import { parseSwitchRomsOrg } from './parsers/switchRomsOrg';
 import { parseRomenix } from './parsers/romenix';
+import { nspGameHubParser } from './parsers/nspGameHub';
+
+export const deepLinkParserMap: Record<string, DeepLinkParser> = {
+  NspGameHub: nspGameHubParser,
+};
+
+export function getDeepLinkParser(sourceName: string): DeepLinkParser | undefined {
+  return deepLinkParserMap[sourceName];
+}
 
 const parserMap: Record<string, (html: string) => GameEntry[]> = {
   FMHY: parseFmhy,

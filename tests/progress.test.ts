@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { reportFetching, reportParsing, reportComplete } from '../src/progress';
+import { reportFetching, reportParsing, reportComplete, reportExtractingLinks, reportFetchingDetails, reportExtractingDownloads } from '../src/progress';
 import { Source } from '../src/types';
 
 describe('progress reporter', () => {
@@ -23,6 +23,27 @@ describe('progress reporter', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     reportComplete();
     expect(spy).toHaveBeenCalledWith('Scraping complete.');
+    spy.mockRestore();
+  });
+
+  it('reportExtractingLinks logs source name', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reportExtractingLinks(source);
+    expect(spy).toHaveBeenCalledWith('Extracting game links from TestSource...');
+    spy.mockRestore();
+  });
+
+  it('reportFetchingDetails logs source name and count', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reportFetchingDetails(source, 5);
+    expect(spy).toHaveBeenCalledWith('Fetching 5 detail pages from TestSource...');
+    spy.mockRestore();
+  });
+
+  it('reportExtractingDownloads logs source name', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    reportExtractingDownloads(source);
+    expect(spy).toHaveBeenCalledWith('Extracting download URLs from TestSource...');
     spy.mockRestore();
   });
 });

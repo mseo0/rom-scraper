@@ -1,6 +1,6 @@
 import axios from 'axios';
 import puppeteer from 'puppeteer';
-import { Source, FetchResult } from './types';
+import { Source, FetchResult, GameLink, DetailPageResult } from './types';
 
 export async function fetchSource(source: Source): Promise<FetchResult> {
   try {
@@ -50,4 +50,37 @@ export async function fetchWithBrowser(url: string): Promise<string> {
   } finally {
     await browser.close();
   }
+}
+
+export async function fetchDetailPages(
+  gameLinks: GameLink[],
+  source: Source,
+  concurrencyLimit: number
+): Promise<DetailPageResult[]> {
+  const results: DetailPageResult[] = [];
+  let index = 0;
+
+  async function next(): Promise<void> {
+    while (index < gameLinks.length) {
+      const currentIndex = index++;
+      const gameLink = gameLinks[currentIndex];
+      try {
+        const html = source.requiresJs
+          ? await fetchWithBrowser(gameLink.url)
+          : await fetchStatic(gameLink.url);
+        results[currentIndex] = { gameLink, html, error: null };
+      } catch (err: unknown) {
+        const message = buildErrorMessage(err, gameLink.url);
+        results[currentIndex] = { gameLink, html: null, error: message };
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrencyLimit, gameLinks.length) },
+    () => next()
+  );
+  await Promise.all(workers);
+
+  return results;
 }

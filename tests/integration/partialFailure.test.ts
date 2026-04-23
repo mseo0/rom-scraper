@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FetchResult, Source } from '../../src/types';
+import { FetchResult, Source, DetailPageResult } from '../../src/types';
 import { TARGET_SOURCES } from '../../src/sources';
 import { formatResults } from '../../src/formatter';
 
 vi.mock('../../src/fetcher');
 vi.mock('../../src/progress');
 
-import { fetchSource } from '../../src/fetcher';
+import { fetchSource, fetchDetailPages } from '../../src/fetcher';
 import { scrapeAll } from '../../src/orchestrator';
 
 const mockedFetch = vi.mocked(fetchSource);
+const mockedFetchDetailPages = vi.mocked(fetchDetailPages);
 
 /** HTML snippets that produce valid .nsp entries when parsed */
 const sourceHtml: Record<string, string> = {
@@ -33,6 +34,18 @@ const sourceHtml: Record<string, string> = {
   Romenix: `<html><body>
     <a href="https://romenix.example.com/fire-emblem-engage.nsp">Fire Emblem Engage</a>
   </body></html>`,
+
+  NspGameHub: `<html><body>
+    <a href="https://nspgamehub.com/game/astral-chain">Astral Chain</a>
+  </body></html>`,
+};
+
+/** Detail page HTML for NspGameHub deep-link source */
+const nspGameHubDetailPages: Record<string, string> = {
+  'https://nspgamehub.com/game/astral-chain': `<html><head><title>Astral Chain</title></head><body>
+    <h1>Astral Chain</h1>
+    <a href="https://dl.nspgamehub.com/astral-chain.nsp">Download</a>
+  </body></html>`,
 };
 
 /** Names of sources that should fail in the "2 fail, 4 succeed" scenario */
@@ -55,6 +68,18 @@ function buildMock(failSet: Set<string>) {
 describe('Partial Source Failure Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock fetchDetailPages for the NspGameHub deep-link source
+    mockedFetchDetailPages.mockImplementation(async (gameLinks) => {
+      return gameLinks.map((gl) => {
+        const html = nspGameHubDetailPages[gl.url] ?? null;
+        return {
+          gameLink: gl,
+          html,
+          error: html ? null : `Failed to fetch ${gl.url}`,
+        } as DetailPageResult;
+      });
+    });
   });
 
   describe('2 sources fail, 4 succeed', () => {
@@ -70,8 +95,8 @@ describe('Partial Source Failure Integration', () => {
       expect(errors.some((e) => e.includes('HTTP error 500'))).toBe(true);
       expect(errors.some((e) => e.includes('timed out'))).toBe(true);
 
-      // Successful sources: RetrogradosGaming(1) + NSWTL(1) + SwitchRomsOrg(2) + Romenix(1) = 5
-      expect(entries).toHaveLength(5);
+      // Successful sources: RetrogradosGaming(1) + NSWTL(1) + SwitchRomsOrg(2) + Romenix(1) + NspGameHub(1) = 6
+      expect(entries).toHaveLength(6);
 
       // No entries from failed sources
       const sourceNames = new Set(entries.map((e) => e.sourceName));
@@ -89,7 +114,7 @@ describe('Partial Source Failure Integration', () => {
       const output = formatResults(entries, errors);
 
       // Summary counts only successful entries
-      expect(output).toContain('Found 5 NSP links across 4 sources');
+      expect(output).toContain('Found 6 NSP links across 5 sources');
 
       // Contains entries from successful sources
       expect(output).toContain('Metroid Dread');
@@ -117,7 +142,7 @@ describe('Partial Source Failure Integration', () => {
       const { entries, errors } = await scrapeAll(TARGET_SOURCES);
 
       expect(entries).toHaveLength(0);
-      expect(errors).toHaveLength(6);
+      expect(errors).toHaveLength(7);
 
       const output = formatResults(entries, errors);
       expect(output).toContain('No .nsp files were found on any source.');
@@ -143,8 +168,8 @@ describe('Partial Source Failure Integration', () => {
 
       const { entries, errors } = await scrapeAll(TARGET_SOURCES);
 
-      // 5 sources failed
-      expect(errors).toHaveLength(5);
+      // 6 sources failed
+      expect(errors).toHaveLength(6);
 
       // Only Romenix entry
       expect(entries).toHaveLength(1);
