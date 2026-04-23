@@ -14,7 +14,7 @@ A CLI tool that scrapes multiple Nintendo Switch ROM sources and displays `.nsp`
 ## Setup
 
 ```bash
-git clone <your-repo-url>
+git clone [this repo]
 cd rom-scraper
 npm install
 npm run build
