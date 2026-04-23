@@ -1,4 +1,5 @@
-/node_modules
-/tests
-.kiro
-.vscode
+node_modules/
+dist/
+.kiro/
+.vscode/
+*.tsbuildinfo

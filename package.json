@@ -2,7 +2,10 @@
   "name": "rom-scraper",
   "version": "1.0.0",
   "description": "Scrapes various sites for rom files",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "bin": {
+    "rom-scraper": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

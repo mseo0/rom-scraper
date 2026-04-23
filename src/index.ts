@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { TARGET_SOURCES } from './sources';
 import { scrapeAll } from './orchestrator';
 import { formatResults, formatSearchResults } from './formatter';
