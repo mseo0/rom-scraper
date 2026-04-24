@@ -49,6 +49,9 @@ function tryParseUrl(url: string): URL | null {
  *
  * Also matches URLs ending in known ROM file extensions (.nsp, .xci, .nsz)
  * with a generic "Direct Download" host name.
+ *
+ * Rejects known false-positive patterns:
+ * - 1fichier.com affiliate-only links (only ?af=... with no file ID)
  */
 export function matchFileHost(url: string): DownloadLink | null {
   const parsed = tryParseUrl(url);
@@ -58,6 +61,23 @@ export function matchFileHost(url: string): DownloadLink | null {
 
   for (const [domain, hostName] of FILE_HOST_DOMAINS) {
     if (hostname === domain || hostname.endsWith('.' + domain)) {
+      // Reject 1fichier affiliate-only links: URLs where the only query
+      // parameter is "af" (affiliate ID) with no file identifier.
+      // Real 1fichier download links have a random file ID as the first
+      // parameter, e.g., ?qkrl9796m94wqb1e0ow7 or ?qkrl9796m94wqb1e0ow7&af=327151
+      if (domain === '1fichier.com') {
+        const params = parsed.searchParams;
+        const keys = Array.from(params.keys());
+        // If the only key is "af", this is an affiliate link, not a download
+        if (keys.length === 1 && keys[0] === 'af') {
+          return null;
+        }
+        // If there are no query params at all, it's just the homepage
+        if (keys.length === 0 && !parsed.search) {
+          return null;
+        }
+      }
+
       return { url, hostName };
     }
   }
