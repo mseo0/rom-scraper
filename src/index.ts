@@ -64,7 +64,7 @@ async function runSearch(query: string): Promise<void> {
 
 async function interactiveMode(): Promise<void> {
   console.log('');
-  console.log(bold(cyan('  🎮  rom-scraper')));
+  console.log(bold(cyan('  rom-scraper')));
   console.log(dim('  Nintendo Switch ROM search tool'));
   console.log('');
 

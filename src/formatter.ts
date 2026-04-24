@@ -12,11 +12,11 @@ export function truncate(text: string, maxLength: number): string {
  * Get an icon for a pack label.
  */
 function getPackIcon(label: string): string {
-  if (label.includes('Base')) return '📦';
-  if (label.includes('Update')) return '🔄';
-  if (label.includes('Full')) return '📀';
-  if (label.includes('DLC')) return '🧩';
-  return '📥';
+  if (label.includes('Base')) return '[base]';
+  if (label.includes('Update')) return '[update]';
+  if (label.includes('Full')) return '[full]';
+  if (label.includes('DLC')) return '[dlc]';
+  return '[download]';
 }
 
 /**
@@ -31,7 +31,7 @@ function formatDownloadLines(entry: GameEntry): string[] {
         return `  ${icon} ${link.hostName}: \x1b[2m${link.url}\x1b[0m`;
       });
   }
-  return [`  📥 Download: \x1b[2m${entry.downloadUrl}\x1b[0m`];
+  return [`  [download] Download: \x1b[2m${entry.downloadUrl}\x1b[0m`];
 }
 
 function formatEntry(entry: GameEntry): string {
