@@ -120,13 +120,13 @@ New Releases — 3 game(s) found:
 1. The Legend of Zelda: Echoes of Wisdom
    Source: notUltraNX
    Downloads:
-  [base] Base Game: https://...
-  [full] Full Pack: https://...
+  [1] Base Game: https://...
+  [2] Full Pack: https://...
 
 2. Super Mario Odyssey
    Source: notUltraNX
    Downloads:
-  [base] Base Game: https://...
+  [3] Base Game: https://...
 ```
 
 ### Ping Sources
@@ -145,7 +145,7 @@ rom-scraper --ping
 
 ### Output Format
 
-Each result shows the game name, source, and labeled download packs:
+Each result shows the game name, source, and numbered download links:
 
 ```
 Found 2 result(s) for 'zelda':
@@ -153,22 +153,34 @@ Found 2 result(s) for 'zelda':
 1. The Legend of Zelda: Echoes of Wisdom
    Source: notUltraNX
    Downloads:
-  [base] Base Game: https://api.ultranx.ru/games/download/.../base
-  [full] Full Pack: https://api.ultranx.ru/games/download/.../full
+  [1] Base Game: https://api.ultranx.ru/games/download/.../base
+  [2] Full Pack: https://api.ultranx.ru/games/download/.../full
 
 2. The Legend of Zelda: Tears of the Kingdom
    Source: notUltraNX
    Downloads:
-  [base] Base Game: https://api.ultranx.ru/games/download/.../base
-  [update] Update:  https://api.ultranx.ru/games/download/.../update
-  [full] Full Pack: https://api.ultranx.ru/games/download/.../full
+  [3] Base Game: https://api.ultranx.ru/games/download/.../base
+  [4] Update:    https://api.ultranx.ru/games/download/.../update
+  [5] Full Pack: https://api.ultranx.ru/games/download/.../full
+
+Copy link #:
 ```
 
+After results are displayed, a `Copy link #:` prompt appears. Type a link number to copy its URL to your clipboard:
+
+```
+Copy link #: 2
+Copied [2]: https://api.ultranx.ru/games/download/.../full
+Copy link #:
+```
+
+You can copy multiple links in a row. Type `q`, `quit`, `exit`, or press Enter to leave the prompt and return to search (interactive mode) or exit (direct mode).
+
 Download labels:
-- **[base] Base Game** — the main game file
-- **[update] Update** — latest game update/patch
-- **[full] Full Pack** — base game + update bundled together
-- **[dlc] DLC** — downloadable content
+- **Base Game** — the main game file
+- **Update** — latest game update/patch
+- **Full Pack** — base game + update bundled together
+- **DLC** — downloadable content
 
 ### Flags
 
@@ -178,8 +190,23 @@ Download labels:
 | `--search <query>`, `-s <query>` | Search for a game (explicit flag) |
 | `--new` | Show recently added games |
 | `--ping` | Check if sources are reachable |
+| `--no-validate`, `-nv` | Skip dead link validation (one-off) |
+| `-nv off` | Disable link validation persistently |
+| `-nv on` | Re-enable link validation persistently |
 
 Flags are mutually exclusive. You can't combine `--new`, `--ping`, or a search query.
+
+### Link Validation
+
+By default, rom-scraper checks that download links are alive before showing them. This adds a few seconds per search. You can control this:
+
+```bash
+rom-scraper -nv off     # turn validation off (saved to ~/.rom-scraper.json)
+rom-scraper -nv on      # turn it back on
+
+rom-scraper zelda       # uses your saved setting
+rom-scraper zelda -nv   # one-off skip, doesn't change saved setting
+```
 
 ## Sources
 
@@ -218,6 +245,7 @@ src/
 ├── parser.ts         # Parser registry
 ├── search.ts         # Game name filtering
 ├── formatter.ts      # Console output formatting
+├── clipboard.ts      # Cross-platform clipboard copy
 ├── progress.ts       # Animated spinner
 ├── ping.ts           # Source health checks
 ├── fileHosts.ts      # File host domain registry

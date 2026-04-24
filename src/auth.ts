@@ -12,11 +12,12 @@ interface Config {
     username: string;
     password: string;
   };
+  validate?: boolean;
 }
 
 let cachedToken: string | null = null;
 
-function readConfig(): Config {
+export function readConfig(): Config {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     return JSON.parse(raw);
@@ -25,7 +26,7 @@ function readConfig(): Config {
   }
 }
 
-function writeConfig(config: Config): void {
+export function writeConfig(config: Config): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
   fs.chmodSync(CONFIG_PATH, 0o600);
 }

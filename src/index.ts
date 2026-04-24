@@ -7,6 +7,7 @@ import { searchGames } from './search';
 import { mergeEntries } from './merger';
 import { runPingCommand } from './ping';
 import { copyToClipboard } from './clipboard';
+import { readConfig, writeConfig } from './auth';
 
 // ANSI color helpers
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
@@ -20,6 +21,8 @@ export interface CliArgs {
   newReleases: boolean;
   ping: boolean;
   noValidate: boolean;
+  /** When set, -nv on/off was used — save to config and exit */
+  validateToggle?: 'on' | 'off';
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -28,7 +31,34 @@ export function parseArgs(argv: string[]): CliArgs {
 
   const hasNew = args.includes('--new');
   const hasPing = args.includes('--ping');
-  const hasNoValidate = args.includes('--no-validate');
+
+  // Check for -nv on / -nv off (persistent toggle)
+  const nvIndex = args.indexOf('-nv');
+  const noValidateIndex = args.indexOf('--no-validate');
+  let validateToggle: 'on' | 'off' | undefined;
+  let hasNoValidate = false;
+
+  if (nvIndex !== -1) {
+    const nextArg = args[nvIndex + 1]?.toLowerCase();
+    if (nextArg === 'on' || nextArg === 'off') {
+      validateToggle = nextArg;
+    } else {
+      // -nv without on/off is a one-off override
+      hasNoValidate = true;
+    }
+  }
+
+  if (noValidateIndex !== -1) {
+    hasNoValidate = true;
+  }
+
+  // If no explicit flag, check persistent config
+  if (!hasNoValidate && !validateToggle) {
+    const config = readConfig();
+    if (config.validate === false) {
+      hasNoValidate = true;
+    }
+  }
 
   // Check for --search or -s flag
   let searchIndex = args.indexOf('--search');
@@ -42,8 +72,18 @@ export function parseArgs(argv: string[]): CliArgs {
     }
     searchQuery = nextArg;
   } else {
-    // Bare arguments (excluding --new, --ping, -s) become the search query
-    const bareArgs = args.filter(a => a !== '--new' && a !== '--ping' && a !== '-s' && a !== '--no-validate');
+    // Bare arguments (excluding flags and their values) become the search query
+    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv']);
+    const skipIndices = new Set<number>();
+    // Mark -nv and its on/off value for skipping
+    if (nvIndex !== -1) {
+      skipIndices.add(nvIndex);
+      const nextArg = args[nvIndex + 1]?.toLowerCase();
+      if (nextArg === 'on' || nextArg === 'off') {
+        skipIndices.add(nvIndex + 1);
+      }
+    }
+    const bareArgs = args.filter((a, i) => !flagArgs.has(a) && !skipIndices.has(i));
     if (bareArgs.length > 0) {
       const query = bareArgs.join(' ').trim();
       if (query) searchQuery = query;
@@ -71,7 +111,7 @@ export function parseArgs(argv: string[]): CliArgs {
     process.exit(1);
   }
 
-  return { searchQuery, newReleases: hasNew, ping: hasPing, noValidate: hasNoValidate };
+  return { searchQuery, newReleases: hasNew, ping: hasPing, noValidate: hasNoValidate, validateToggle };
 }
 
 function prompt(question: string): Promise<string> {
@@ -183,7 +223,17 @@ async function runNewReleases(noValidate: boolean = false): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const { searchQuery, newReleases, ping, noValidate } = parseArgs(process.argv);
+  const { searchQuery, newReleases, ping, noValidate, validateToggle } = parseArgs(process.argv);
+
+  // Handle persistent toggle: rom-scraper -nv on / rom-scraper -nv off
+  if (validateToggle) {
+    const config = readConfig();
+    config.validate = validateToggle === 'on';
+    writeConfig(config);
+    const state = validateToggle === 'on' ? 'enabled' : 'disabled';
+    console.log(`Link validation ${state}.`);
+    return;
+  }
 
   if (ping) {
     await runPingCommand(TARGET_SOURCES);
