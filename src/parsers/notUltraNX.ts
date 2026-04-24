@@ -8,6 +8,12 @@ import { SourceParser, GameLink } from '../types';
  * Catalog shows game titles, release dates, and file sizes in a grid layout.
  */
 export const notUltraNXParser: SourceParser = {
+  getNewReleasesUrl(baseUrl: string): string {
+    // The default catalog page already shows games ordered by release date
+    // (most recent first), so we return the base URL directly.
+    return baseUrl;
+  },
+
   getSearchUrl(query: string, baseUrl: string): string {
     return `${baseUrl}?s=${encodeURIComponent(query)}`;
   },

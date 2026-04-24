@@ -95,3 +95,25 @@ export function formatResults(entries: GameEntry[], errors: string[]): string {
 
   return parts.join('\n');
 }
+
+export function formatNewReleases(entries: GameEntry[], errors: string[]): string {
+  if (entries.length === 0) {
+    const parts: string[] = ['No new releases found.'];
+    if (errors.length > 0) {
+      parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
+    }
+    return parts.join('\n');
+  }
+
+  const parts: string[] = [
+    `New Releases — ${entries.length} game(s) found:`,
+    '',
+    formatEntries(entries),
+  ];
+
+  if (errors.length > 0) {
+    parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
+  }
+
+  return parts.join('\n');
+}

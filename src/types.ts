@@ -41,6 +41,12 @@ export interface SourceParser {
    * If not implemented, the orchestrator uses the default catalog URL.
    */
   getSearchUrl?(query: string, baseUrl: string): string;
+
+  /**
+   * Build a URL that returns recently added/released games for this source.
+   * If not implemented, the source is skipped during new-releases mode.
+   */
+  getNewReleasesUrl?(baseUrl: string): string;
 }
 
 export interface FetchResult {
@@ -64,9 +70,4 @@ export interface DetailPageResult {
   gameLink: GameLink;
   html: string | null;
   error: string | null;
-}
-
-export interface DeepLinkParser {
-  extractGameLinks(html: string, baseUrl: string): GameLink[];
-  extractDownloadEntry(html: string, gameLink: GameLink, source: Source): GameEntry | null;
 }

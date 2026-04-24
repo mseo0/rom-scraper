@@ -1,47 +1,68 @@
-import { Source } from './types';
-
 // ANSI colors
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
-const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-let spinnerIdx = 0;
+const FRAME_INTERVAL = 80; // ms
 
-function spin(): string {
-  const s = SPINNER[spinnerIdx % SPINNER.length];
-  spinnerIdx++;
-  return cyan(s);
-}
+let timer: ReturnType<typeof setInterval> | null = null;
+let frameIndex: number = 0;
 
-function status(icon: string, source: string, action: string, detail?: string): void {
+/**
+ * Write a status line to stdout, overwriting the current line.
+ * Does NOT append a newline — the caller decides when to finalize.
+ */
+function writeLine(icon: string, source: string, action: string, detail?: string): void {
   const parts = [`  ${icon} ${cyan(source)} ${dim('→')} ${action}`];
   if (detail) parts[0] += ` ${dim(detail)}`;
-  process.stdout.write(`\r\x1b[K${parts[0]}\n`);
+  process.stdout.write(`\r\x1b[K${parts[0]}`);
 }
 
-export function reportFetching(source: Source): void {
-  const js = source.requiresJs ? dim(' (browser)') : '';
-  status(spin(), source.name, 'fetching catalog', js);
+/**
+ * Start an animated spinner on the current terminal line.
+ * If a previous spinner is still running, it is stopped first (no newline).
+ */
+export function startSpinner(source: string, action: string, detail?: string): void {
+  // Stop any existing spinner without writing a newline
+  if (timer !== null) {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  frameIndex = 0;
+
+  // Write the first frame immediately
+  writeLine(cyan(SPINNER[0]), source, action, detail);
+  frameIndex = 1;
+
+  timer = setInterval(() => {
+    const char = SPINNER[frameIndex % SPINNER.length];
+    writeLine(cyan(char), source, action, detail);
+    frameIndex++;
+  }, FRAME_INTERVAL);
 }
 
-export function reportParsing(source: Source): void {
-  status(spin(), source.name, 'parsing');
+/**
+ * Stop the active spinner and write a final settled line followed by \n.
+ * If no spinner is active, just writes the final line.
+ */
+export function stopSpinner(finalIcon: string, source: string, action: string, detail?: string): void {
+  if (timer !== null) {
+    clearInterval(timer);
+    timer = null;
+  }
+  writeLine(finalIcon, source, action, detail);
+  process.stdout.write('\n');
 }
 
+/**
+ * Write the "Done" line. Ensures any active spinner is stopped first.
+ */
 export function reportComplete(): void {
+  if (timer !== null) {
+    clearInterval(timer);
+    timer = null;
+  }
   process.stdout.write(`\r\x1b[K  ${green('✓')} ${green('Done')}\n`);
-}
-
-export function reportExtractingLinks(source: Source): void {
-  status(spin(), source.name, 'extracting game links');
-}
-
-export function reportFetchingDetails(source: Source, count: number): void {
-  status(spin(), source.name, `fetching ${count} detail pages`);
-}
-
-export function reportExtractingDownloads(source: Source): void {
-  status(spin(), source.name, 'extracting downloads');
 }

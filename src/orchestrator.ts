@@ -1,19 +1,12 @@
 import { Source, GameEntry, GameLink } from './types';
 import { DownloadLink, filterDownloadLinks } from './fileHosts';
 import { fetchSource, fetchDetailPages } from './fetcher';
-import { parseSource, getDeepLinkParser, getSourceParser } from './parser';
+import { parseSource, getSourceParser } from './parser';
 import { getUltraNXToken } from './auth';
 import axios from 'axios';
-import {
-  reportFetching,
-  reportParsing,
-  reportComplete,
-  reportExtractingLinks,
-  reportFetchingDetails,
-  reportExtractingDownloads,
-} from './progress';
+import { startSpinner, stopSpinner, reportComplete } from './progress';
 
-export async function scrapeAll(sources: Source[], searchQuery?: string | null): Promise<{entries: GameEntry[], errors: string[]}> {
+export async function scrapeAll(sources: Source[], searchQuery?: string | null, newReleases?: boolean): Promise<{entries: GameEntry[], errors: string[]}> {
   const allEntries: GameEntry[] = [];
   const allErrors: string[] = [];
   let index = 1;
@@ -24,24 +17,32 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
     if (sourceParser) {
       // === Multi-layer pipeline ===
 
-      // 1. Determine the URL to fetch: search URL if query provided, otherwise catalog URL
+      // 1. Determine the URL to fetch based on mode
       let fetchUrl = source.url;
-      if (searchQuery && sourceParser.getSearchUrl) {
+      if (newReleases) {
+        if (!sourceParser.getNewReleasesUrl) {
+          process.stdout.write(`  \x1b[2m${source.name} → does not support new releases\x1b[0m\n`);
+          continue;
+        }
+        fetchUrl = sourceParser.getNewReleasesUrl(source.url);
+      } else if (searchQuery && sourceParser.getSearchUrl) {
         fetchUrl = sourceParser.getSearchUrl(searchQuery, source.url);
       }
       const fetchSource_ = { ...source, url: fetchUrl };
 
       // 2. Fetch catalog/search page
-      reportFetching(fetchSource_);
+      startSpinner(source.name, 'fetching catalog', source.requiresJs ? '(browser)' : undefined);
       const fetchResult = await fetchSource(fetchSource_);
+      stopSpinner('✓', source.name, 'fetched catalog');
       if (fetchResult.error) {
         allErrors.push(fetchResult.error);
         continue;
       }
 
       // 2. Extract game links via SourceParser
-      reportExtractingLinks(source);
+      startSpinner(source.name, 'extracting game links');
       const gameLinks = sourceParser.extractGameLinks(fetchResult.html!, fetchUrl);
+      stopSpinner('✓', source.name, 'extracted game links');
 
       // 3. Deduplicate game links by URL
       const seen = new Set<string>();
@@ -60,8 +61,9 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
       }
 
       // 5. Fetch detail pages concurrently (concurrency limit = 5)
-      reportFetchingDetails(source, uniqueLinks.length);
+      startSpinner(source.name, `fetching ${uniqueLinks.length} detail pages`);
       const detailResults = await fetchDetailPages(uniqueLinks, source, 5);
+      stopSpinner('✓', source.name, 'fetched detail pages');
 
       // 6. Collect errors from failed detail page fetches
       for (const result of detailResults) {
@@ -71,13 +73,14 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
       }
 
       // 7. Extract download links from successful detail pages
-      reportExtractingDownloads(source);
+      startSpinner(source.name, 'extracting downloads');
 
       // For notUltraNX, get auth token before resolving download URLs
       let ultranxToken: string | null = null;
       if (source.name === 'notUltraNX') {
         ultranxToken = await getUltraNXToken();
         if (!ultranxToken) {
+          stopSpinner('✓', source.name, 'extracted downloads');
           process.stdout.write(`  \x1b[33mnotUltraNX → skipped (login required)\x1b[0m\n`);
           continue;
         }
@@ -116,99 +119,36 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
           }
         }
       }
-    } else if (source.deepLink) {
-      // === Legacy deep-link pipeline (existing) ===
-
-      // 1. Fetch listing page
-      reportFetching(source);
-      const fetchResult = await fetchSource(source);
-      if (fetchResult.error) {
-        allErrors.push(fetchResult.error);
-        continue;
-      }
-
-      // 2. Get deep link parser
-      const parser = getDeepLinkParser(source.name);
-      if (!parser) {
-        const msg = `No deep link parser for ${source.name}`;
-        process.stdout.write(`  \x1b[2m${msg}\x1b[0m\n`);
-        allErrors.push(msg);
-        continue;
-      }
-
-      // 3. Extract game links from listing page
-      reportExtractingLinks(source);
-      const gameLinks = parser.extractGameLinks(fetchResult.html!, source.url);
-
-      // 4. Deduplicate game links by URL
-      const seen = new Set<string>();
-      const uniqueLinks: GameLink[] = [];
-      for (const link of gameLinks) {
-        if (!seen.has(link.url)) {
-          seen.add(link.url);
-          uniqueLinks.push(link);
-        }
-      }
-
-      // 5. If no game links found, log and continue
-      if (uniqueLinks.length === 0) {
-        process.stdout.write(`  \x1b[2m${source.name} → no game links\x1b[0m\n`);
-        continue;
-      }
-
-      // 6. Fetch detail pages concurrently
-      reportFetchingDetails(source, uniqueLinks.length);
-      const detailResults = await fetchDetailPages(uniqueLinks, source, 5);
-
-      // 7. Collect errors from failed detail page fetches
-      for (const result of detailResults) {
-        if (result.error) {
-          allErrors.push(result.error);
-        }
-      }
-
-      // 8. Extract download entries from successful detail pages
-      reportExtractingDownloads(source);
-      for (const result of detailResults) {
-        if (result.html) {
-          const entry = parser.extractDownloadEntry(result.html, result.gameLink, source);
-          if (entry) {
-            entry.index = index++;
-            // Wrap downloadUrl into downloadLinks for backward compatibility
-            if (!entry.downloadLinks || entry.downloadLinks.length === 0) {
-              entry.downloadLinks = [{ url: entry.downloadUrl, hostName: 'Direct Download' }];
-            }
-            allEntries.push(entry);
-          }
-        }
-      }
+      stopSpinner('✓', source.name, 'extracted downloads');
     } else {
+      if (newReleases) {
+        process.stdout.write(`  \x1b[2m${source.name} → does not support new releases\x1b[0m\n`);
+        continue;
+      }
       // === Single-pass pipeline (existing) ===
 
-      // 1. Report fetching progress
-      reportFetching(source);
-
-      // 2. Fetch the source
+      // 1. Fetch the source
+      startSpinner(source.name, 'fetching catalog');
       const fetchResult = await fetchSource(source);
+      stopSpinner('✓', source.name, 'fetched catalog');
 
-      // 3. If fetch failed, record error and continue
+      // 2. If fetch failed, record error and continue
       if (fetchResult.error) {
         allErrors.push(fetchResult.error);
         continue;
       }
 
-      // 4. Report parsing progress
-      reportParsing(source);
-
-      // 5. Parse the HTML
+      // 3. Parse the HTML
+      startSpinner(source.name, 'parsing');
       const parseResult = parseSource(source, fetchResult.html!);
+      stopSpinner('✓', source.name, 'parsed');
 
-      // 6. If message (no links found), log it
+      // 4. If message (no links found), log it
       if (parseResult.message) {
         process.stdout.write(`  \x1b[2m${parseResult.message}\x1b[0m\n`);
       }
 
-      // 7. Add entries with sequential index
+      // 5. Add entries with sequential index
       for (const entry of parseResult.entries) {
         entry.index = index++;
         // Wrap downloadUrl into downloadLinks for backward compatibility
