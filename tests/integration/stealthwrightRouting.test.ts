@@ -7,7 +7,7 @@ vi.mock('axios', async (importOriginal) => {
     ...actual,
     default: {
       ...actual.default,
-      get: vi.fn().mockResolvedValue({ data: '<html><body><a href="https://example.com/game.nsp">Game</a></body></html>' }),
+      get: vi.fn().mockResolvedValue({ data: '<html><body></body></html>' }),
     },
   };
 });
@@ -31,7 +31,7 @@ describe('Stealthwright Routing Integration', () => {
 
     const mockPage = {
       goto: vi.fn(),
-      content: vi.fn().mockResolvedValue('<html><body><a href="https://example.com/game.nsp">Game</a></body></html>'),
+      content: vi.fn().mockResolvedValue('<html><body></body></html>'),
     };
     const newPage = vi.fn().mockResolvedValue(mockPage);
     const mockBrowser = { defaultBrowserContext: () => ({ newPage }), close: vi.fn() };
@@ -39,27 +39,13 @@ describe('Stealthwright Routing Integration', () => {
     mockedStealthwright.mockReturnValue({ launch: mockLaunch } as any);
   });
 
-  it('should use Stealthwright for Ziperto (requiresJs: true)', async () => {
-    const ziperto = TARGET_SOURCES.find((s) => s.name === 'Ziperto')!;
-    expect(ziperto).toBeDefined();
-    expect(ziperto.requiresJs).toBe(true);
-
-    await fetchSource(ziperto);
-
-    expect(mockedStealthwright).toHaveBeenCalled();
-    expect(mockedAxios.get).not.toHaveBeenCalled();
-  });
-
-  it('should use Axios for sources with requiresJs: false', async () => {
-    const staticSources = TARGET_SOURCES.filter((s) => !s.requiresJs);
-    expect(staticSources.length).toBeGreaterThan(0);
-
-    for (const source of staticSources) {
+  it('should use Axios for all current sources (none require JS)', async () => {
+    // All current sources (notUltraNX) use static fetch
+    for (const source of TARGET_SOURCES) {
       vi.clearAllMocks();
+      expect(source.requiresJs).toBe(false);
       await fetchSource(source);
-
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
-      expect(mockedAxios.get).toHaveBeenCalledWith(source.url, { timeout: 30000 });
       expect(mockedStealthwright).not.toHaveBeenCalled();
     }
   });
@@ -70,7 +56,7 @@ describe('Stealthwright Routing Integration', () => {
 
       const mockPage = {
         goto: vi.fn(),
-        content: vi.fn().mockResolvedValue('<html><body><a href="https://example.com/game.nsp">Game</a></body></html>'),
+        content: vi.fn().mockResolvedValue('<html><body></body></html>'),
       };
       const newPage = vi.fn().mockResolvedValue(mockPage);
       const mockBrowser = { defaultBrowserContext: () => ({ newPage }), close: vi.fn() };

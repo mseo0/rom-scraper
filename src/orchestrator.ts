@@ -88,6 +88,14 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
           const extracted = sourceParser.extractDownloadLinks(result.html, result.gameLink.url);
           let downloadLinks = filterDownloadLinks(extracted.urls);
 
+          // For notUltraNX, label each link with its pack type before resolving
+          if (source.name === 'notUltraNX') {
+            downloadLinks = downloadLinks.map((link) => ({
+              url: link.url,
+              hostName: labelFromApiUrl(link.url),
+            }));
+          }
+
           // Resolve notUltraNX download URLs to actual file URLs
           if (ultranxToken && downloadLinks.length > 0) {
             const resolved = await resolveUltraNXLinks(downloadLinks, ultranxToken);
@@ -220,9 +228,25 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
 
 
 /**
+ * Derive a pack label from a notUltraNX API download URL.
+ * URLs: https://api.ultranx.ru/games/download/{titleId}/{type}
+ */
+function labelFromApiUrl(url: string): string {
+  try {
+    const segments = new URL(url).pathname.split('/').filter(Boolean);
+    const last = segments[segments.length - 1]?.toLowerCase() || '';
+    if (last === 'base') return 'Base Game';
+    if (last === 'update') return 'Update';
+    if (last === 'full') return 'Full Pack';
+    return 'DLC';
+  } catch {
+    return 'Download';
+  }
+}
+
+/**
  * Resolve notUltraNX API download URLs to actual file download URLs.
- * The API uses an auth_token cookie for download authentication.
- * It returns a redirect (302) to the real file URL when given a valid token.
+ * Preserves the hostName (pack label) from the original link.
  */
 async function resolveUltraNXLinks(links: DownloadLink[], token: string): Promise<DownloadLink[]> {
   const resolved: DownloadLink[] = [];
@@ -241,19 +265,15 @@ async function resolveUltraNXLinks(links: DownloadLink[], token: string): Promis
         validateStatus: (s) => s >= 200 && s < 400,
       });
 
-      // If we get a redirect, use the Location header as the real download URL
       if (response.status >= 300 && response.headers.location) {
-        resolved.push({ url: response.headers.location, hostName: 'Direct Download' });
+        resolved.push({ url: response.headers.location, hostName: link.hostName });
       } else {
-        // API returned content directly — keep original URL
         resolved.push(link);
       }
     } catch (err: any) {
-      // Axios throws on 3xx when maxRedirects=0, check for redirect
       if (err?.response?.status >= 300 && err?.response?.headers?.location) {
-        resolved.push({ url: err.response.headers.location, hostName: 'Direct Download' });
+        resolved.push({ url: err.response.headers.location, hostName: link.hostName });
       } else {
-        // Resolution failed — keep original URL
         resolved.push(link);
       }
     }

@@ -1,4 +1,3 @@
-import Table from 'cli-table3';
 import { GameEntry } from './types';
 import { DownloadLink } from './fileHosts';
 
@@ -10,28 +9,42 @@ export function truncate(text: string, maxLength: number): string {
 }
 
 /**
- * Create a clickable terminal hyperlink using OSC 8 escape sequence.
- * Supported by iTerm2, Terminal.app (macOS Sonoma+), Hyper, VS Code terminal, etc.
- * Falls back to just showing the label text in terminals that don't support it.
+ * Get an icon for a pack label.
  */
-function hyperlink(url: string, label: string): string {
-  return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`;
+function getPackIcon(label: string): string {
+  if (label.includes('Base')) return '📦';
+  if (label.includes('Update')) return '🔄';
+  if (label.includes('Full')) return '📀';
+  if (label.includes('DLC')) return '🧩';
+  return '📥';
 }
 
 /**
- * Format the download URL column for a GameEntry.
- * Shows clickable, colored, compact download links.
+ * Format the download list for a GameEntry using a plain console layout.
+ * Uses the hostName field which is set to the pack label by the orchestrator.
  */
-function formatDownloadColumn(entry: GameEntry): string {
+function formatDownloadLines(entry: GameEntry): string[] {
   if (entry.downloadLinks && entry.downloadLinks.length > 0) {
     return entry.downloadLinks
       .map((link: DownloadLink) => {
-        const label = `\x1b[36m${link.hostName}\x1b[0m`;
-        return hyperlink(link.url, `📥 ${label}`);
-      })
-      .join('  ');
+        const icon = getPackIcon(link.hostName);
+        return `  ${icon} ${link.hostName}: \x1b[2m${link.url}\x1b[0m`;
+      });
   }
-  return hyperlink(entry.downloadUrl, `\x1b[36m📥 Download\x1b[0m`);
+  return [`  📥 Download: \x1b[2m${entry.downloadUrl}\x1b[0m`];
+}
+
+function formatEntry(entry: GameEntry): string {
+  return [
+    `${entry.index}. ${truncate(entry.gameName, 50)}`,
+    `   Source: ${entry.sourceName}`,
+    '   Downloads:',
+    ...formatDownloadLines(entry),
+  ].join('\n');
+}
+
+function formatEntries(entries: GameEntry[]): string {
+  return entries.map(formatEntry).join('\n\n');
 }
 
 export function buildSummary(entries: GameEntry[]): string {
@@ -56,20 +69,7 @@ export function formatSearchResults(entries: GameEntry[], query: string, errors:
     return parts.join('\n');
   }
 
-  const table = new Table({
-    head: ['#', 'Game Name', 'Source', 'Downloads'],
-  });
-
-  for (const entry of entries) {
-    table.push([
-      entry.index,
-      truncate(entry.gameName, 50),
-      entry.sourceName,
-      formatDownloadColumn(entry),
-    ]);
-  }
-
-  const parts: string[] = [`Found ${entries.length} result(s) for '${query}':`, '', table.toString()];
+  const parts: string[] = [`Found ${entries.length} result(s) for '${query}':`, '', formatEntries(entries)];
 
   if (errors.length > 0) {
     parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
@@ -87,20 +87,7 @@ export function formatResults(entries: GameEntry[], errors: string[]): string {
     return parts.join('\n');
   }
 
-  const table = new Table({
-    head: ['#', 'Game Name', 'Source', 'Downloads'],
-  });
-
-  for (const entry of entries) {
-    table.push([
-      entry.index,
-      truncate(entry.gameName, 50),
-      entry.sourceName,
-      formatDownloadColumn(entry),
-    ]);
-  }
-
-  const parts: string[] = [buildSummary(entries), '', table.toString()];
+  const parts: string[] = [buildSummary(entries), '', formatEntries(entries)];
 
   if (errors.length > 0) {
     parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));

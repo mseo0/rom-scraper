@@ -50,10 +50,10 @@ describe("formatResults with summary", () => {
     const output = formatResults(entries, []);
     expect(output).toContain("Found 2 NSP links across 2 sources:");
     expect(output).toContain("FMHY: 1 | SwitchRom: 1");
-    // Summary should appear before the table
+    // Summary should appear before the first rendered result
     const summaryIdx = output.indexOf("Found 2");
-    const tableIdx = output.indexOf("┌");
-    expect(summaryIdx).toBeLessThan(tableIdx);
+    const firstResultIdx = output.indexOf("1. Test Game");
+    expect(summaryIdx).toBeLessThan(firstResultIdx);
   });
 
   it("does not include summary when no entries", () => {

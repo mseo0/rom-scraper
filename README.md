@@ -1,6 +1,6 @@
 # rom-scraper
 
-A CLI tool for searching and downloading Nintendo Switch ROMs directly from [notUltraNX](https://not.ultranx.ru/en). Search by game name, get clickable download links in your terminal.
+A CLI tool for searching and downloading Nintendo Switch ROMs directly from [notUltraNX](https://not.ultranx.ru/en). Search by game name, get labeled download links in your terminal.
 
 ## Why notUltraNX
 
@@ -8,7 +8,7 @@ Most ROM sites are riddled with fake download buttons, ad gates, link shorteners
 
 notUltraNX is different:
 
-- **Direct downloads** — files are served from their own API (`api.ultranx.ru`), not through third-party file hosts or ad-gated link shorteners
+- **Direct downloads** — files are served from their own API, not through third-party file hosts or ad-gated link shorteners
 - **No intermediaries** — no bit.ly, adf.ly, ouo.io, linkvertise, or any other ad gate sitting between you and the file
 - **No fake download buttons** — the site has a clean UI with real download links, no deceptive ads disguised as buttons
 - **No malware risk from file hosts** — since files come from notUltraNX's own servers, you're not downloading from random file hosting services that bundle adware or worse
@@ -42,20 +42,16 @@ notUltraNX requires a free account. Register at [not.ultranx.ru/en/register](htt
 
 Just run it — you get a search prompt that loops:
 
-```bash
-rom-scraper
 ```
+$ rom-scraper
 
-```
   🎮  rom-scraper
   Nintendo Switch ROM search tool
 
   Search Game: zelda
-
-  Searching for "zelda"...
 ```
 
-Type `exit`, `quit`, `q`, or press Enter with nothing to exit.
+Type `exit`, `quit`, `q`, or press Enter to exit.
 
 ### Direct search
 
@@ -65,27 +61,32 @@ rom-scraper fire emblem
 rom-scraper "mario kart"
 ```
 
-The `--search` flag also works:
-
-```bash
-rom-scraper --search "metroid"
-```
-
 ### Output
 
-Download links are clickable in supported terminals (iTerm2, Terminal.app, VS Code terminal). Cmd+click to open in your browser.
+Each result shows the game name, source, and labeled download packs with full URLs:
 
 ```
 Found 5 result(s) for 'zelda':
 
-┌───┬──────────────────────────────────────────┬────────────┬─────────────────────────────┐
-│ # │ Game Name                                │ Source     │ Downloads                   │
-├───┼──────────────────────────────────────────┼────────────┼─────────────────────────────┤
-│ 1 │ The Legend of Zelda: Echoes of Wisdom    │ notUltraNX │ 📥 Direct Download          │
-├───┼──────────────────────────────────────────┼────────────┼─────────────────────────────┤
-│ 2 │ The Legend of Zelda: Tears of the Kingdom│ notUltraNX │ 📥 Direct Download          │
-└───┴──────────────────────────────────────────┴────────────┴─────────────────────────────┘
+1. The Legend of Zelda™: Echoes of Wisdom
+   Source: notUltraNX
+   Downloads:
+  📦 Base Game: https://api.ultranx.ru/games/download/.../base
+  📀 Full Pack: https://api.ultranx.ru/games/download/.../full
+
+2. The Legend of Zelda™: Tears of the Kingdom
+   Source: notUltraNX
+   Downloads:
+  📦 Base Game: https://api.ultranx.ru/games/download/.../base
+  🔄 Update:    https://api.ultranx.ru/games/download/.../update
+  📀 Full Pack: https://api.ultranx.ru/games/download/.../full
 ```
+
+Download labels:
+- 📦 **Base Game** — the main game file
+- 🔄 **Update** — latest game update/patch
+- 📀 **Full Pack** — base game + update bundled together
+- 🧩 **DLC** — downloadable content
 
 ## Development
 
