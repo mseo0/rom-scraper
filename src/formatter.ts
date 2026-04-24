@@ -1,6 +1,12 @@
 import { MergedEntry, SourceGroup } from './types';
 import { DownloadLink } from './fileHosts';
 
+/** Structured output from format functions */
+export interface FormattedOutput {
+  text: string;
+  linkMap: Map<number, string>;
+}
+
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) {
     return text;
@@ -9,25 +15,22 @@ export function truncate(text: string, maxLength: number): string {
 }
 
 /**
- * Get an icon for a pack label.
- */
-function getPackIcon(label: string): string {
-  if (label.includes('Base')) return '[base]';
-  if (label.includes('Update')) return '[update]';
-  if (label.includes('Full')) return '[full]';
-  if (label.includes('DLC')) return '[dlc]';
-  return '[download]';
-}
-
-/**
  * Format download link lines for a single SourceGroup.
  * Each line is prefixed with the given string (used for box-drawing alignment).
+ * Assigns sequential [N] numbers to each link using the shared counter and linkMap.
  */
-function formatSourceDownloadLines(sourceGroup: SourceGroup, prefix: string): string[] {
+function formatSourceDownloadLines(
+  sourceGroup: SourceGroup,
+  prefix: string,
+  counter: { value: number },
+  linkMap: Map<number, string>,
+): string[] {
   if (sourceGroup.downloadLinks.length > 0) {
     return sourceGroup.downloadLinks.map((link: DownloadLink) => {
-      const icon = getPackIcon(link.hostName);
-      return `${prefix}${icon} ${link.hostName}: \x1b[2m${link.url}\x1b[0m`;
+      const idx = counter.value;
+      counter.value++;
+      linkMap.set(idx, link.url);
+      return `${prefix}[${idx}] ${link.hostName}: \x1b[2m${link.url}\x1b[0m`;
     });
   }
   return [];
@@ -42,13 +45,17 @@ function formatSourceDownloadLines(sourceGroup: SourceGroup, prefix: string): st
  * Multiple sources (2+ SourceGroups): box-drawing characters visually
  * distinguish each source section.
  */
-function formatEntry(entry: MergedEntry): string {
+function formatEntry(
+  entry: MergedEntry,
+  counter: { value: number },
+  linkMap: Map<number, string>,
+): string {
   const heading = `${entry.index}. ${truncate(entry.gameName, 50)}`;
 
   if (entry.sourceGroups.length === 1) {
     // Single source — backward-compatible format
     const sg = entry.sourceGroups[0];
-    const downloadLines = formatSourceDownloadLines(sg, '  ');
+    const downloadLines = formatSourceDownloadLines(sg, '  ', counter, linkMap);
     if (downloadLines.length === 0) {
       // Fallback when no download links exist
       return [heading, `   Source: ${sg.sourceName}`, '   Downloads:'].join('\n');
@@ -78,14 +85,18 @@ function formatEntry(entry: MergedEntry): string {
     }
 
     const dlPrefix = isLast ? '      ' : '   │  ';
-    lines.push(...formatSourceDownloadLines(sg, dlPrefix));
+    lines.push(...formatSourceDownloadLines(sg, dlPrefix, counter, linkMap));
   });
 
   return lines.join('\n');
 }
 
-function formatEntries(entries: MergedEntry[]): string {
-  return entries.map(formatEntry).join('\n\n');
+function formatEntries(
+  entries: MergedEntry[],
+  counter: { value: number },
+  linkMap: Map<number, string>,
+): string {
+  return entries.map(e => formatEntry(e, counter, linkMap)).join('\n\n');
 }
 
 export function buildSummary(entries: MergedEntry[]): string {
@@ -103,60 +114,69 @@ export function buildSummary(entries: MergedEntry[]): string {
   return `Found ${total} unique games across ${sourceCount} sources:\n  ${breakdown}`;
 }
 
-export function formatSearchResults(entries: MergedEntry[], query: string, errors: string[]): string {
+export function formatSearchResults(entries: MergedEntry[], query: string, errors: string[]): FormattedOutput {
+  const linkMap = new Map<number, string>();
+
   if (entries.length === 0) {
     const parts: string[] = [`No games found matching '${query}'.`];
     if (errors.length > 0) {
       parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
     }
-    return parts.join('\n');
+    return { text: parts.join('\n'), linkMap };
   }
 
-  const parts: string[] = [`Found ${entries.length} result(s) for '${query}':`, '', formatEntries(entries)];
+  const counter = { value: 1 };
+  const parts: string[] = [`Found ${entries.length} result(s) for '${query}':`, '', formatEntries(entries, counter, linkMap)];
 
   if (errors.length > 0) {
     parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
   }
 
-  return parts.join('\n');
+  return { text: parts.join('\n'), linkMap };
 }
 
-export function formatResults(entries: MergedEntry[], errors: string[]): string {
+export function formatResults(entries: MergedEntry[], errors: string[]): FormattedOutput {
+  const linkMap = new Map<number, string>();
+
   if (entries.length === 0) {
     const parts: string[] = ['No .nsp files were found on any source.'];
     if (errors.length > 0) {
       parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
     }
-    return parts.join('\n');
+    return { text: parts.join('\n'), linkMap };
   }
 
-  const parts: string[] = [buildSummary(entries), '', formatEntries(entries)];
+  const counter = { value: 1 };
+  const parts: string[] = [buildSummary(entries), '', formatEntries(entries, counter, linkMap)];
 
   if (errors.length > 0) {
     parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
   }
 
-  return parts.join('\n');
+  return { text: parts.join('\n'), linkMap };
 }
 
-export function formatNewReleases(entries: MergedEntry[], errors: string[]): string {
+export function formatNewReleases(entries: MergedEntry[], errors: string[]): FormattedOutput {
+  const linkMap = new Map<number, string>();
+
   if (entries.length === 0) {
     const parts: string[] = ['No new releases found.'];
     if (errors.length > 0) {
       parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
     }
-    return parts.join('\n');
+    return { text: parts.join('\n'), linkMap };
   }
 
+  const counter = { value: 1 };
   const parts: string[] = [
     `New Releases — ${entries.length} game(s) found:`,
     '',
-    formatEntries(entries),
+    formatEntries(entries, counter, linkMap),
   ];
 
   if (errors.length > 0) {
     parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
   }
 
-  return parts.join('\n');
+  return { text: parts.join('\n'), linkMap };
 }

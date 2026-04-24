@@ -2,10 +2,11 @@
 import * as readline from 'readline';
 import { TARGET_SOURCES } from './sources';
 import { scrapeAll } from './orchestrator';
-import { formatResults, formatSearchResults, formatNewReleases } from './formatter';
+import { formatResults, formatSearchResults, formatNewReleases, truncate } from './formatter';
 import { searchGames } from './search';
 import { mergeEntries } from './merger';
 import { runPingCommand } from './ping';
+import { copyToClipboard } from './clipboard';
 
 // ANSI color helpers
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
@@ -86,12 +87,53 @@ function prompt(question: string): Promise<string> {
   });
 }
 
+export async function runClipboardPrompt(
+  linkMap: Map<number, string>,
+  isInteractive: boolean,
+): Promise<void> {
+  const maxKey = Math.max(...linkMap.keys());
+
+  while (true) {
+    const answer = await prompt('Copy link #: ');
+
+    // Exit commands: q, quit, exit, or empty string
+    const lower = answer.toLowerCase();
+    if (lower === 'q' || lower === 'quit' || lower === 'exit' || answer === '') {
+      break;
+    }
+
+    const num = Number(answer);
+
+    if (isNaN(num) || !Number.isInteger(num)) {
+      console.log('Invalid input. Enter a link number or q to exit.');
+      continue;
+    }
+
+    if (num < 1 || num > maxKey) {
+      console.log(`Invalid link number. Enter a number between 1 and ${maxKey}.`);
+      continue;
+    }
+
+    const url = linkMap.get(num)!;
+    const result = copyToClipboard(url);
+
+    if (result.success) {
+      console.log(`Copied [${num}]: ${truncate(url, 60)}`);
+    } else {
+      console.log(`Clipboard error: ${result.error}`);
+    }
+  }
+}
+
 async function runSearch(query: string, noValidate: boolean = false): Promise<void> {
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, query, false, { validate: !noValidate });
   const merged = mergeEntries(entries);
   const filtered = searchGames(query, merged);
-  const output = formatSearchResults(filtered, query, errors);
-  console.log(output);
+  const { text, linkMap } = formatSearchResults(filtered, query, errors);
+  console.log(text);
+  if (linkMap.size > 0) {
+    await runClipboardPrompt(linkMap, false);
+  }
 }
 
 async function interactiveMode(noValidate: boolean = false): Promise<void> {
@@ -117,7 +159,14 @@ async function interactiveMode(noValidate: boolean = false): Promise<void> {
     console.log(yellow(`  Searching for "${query}"...`));
     console.log('');
 
-    await runSearch(query, noValidate);
+    const { entries, errors } = await scrapeAll(TARGET_SOURCES, query, false, { validate: !noValidate });
+    const merged = mergeEntries(entries);
+    const filtered = searchGames(query, merged);
+    const { text, linkMap } = formatSearchResults(filtered, query, errors);
+    console.log(text);
+    if (linkMap.size > 0) {
+      await runClipboardPrompt(linkMap, true);
+    }
 
     console.log('');
   }
@@ -126,8 +175,11 @@ async function interactiveMode(noValidate: boolean = false): Promise<void> {
 async function runNewReleases(noValidate: boolean = false): Promise<void> {
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, null, true, { validate: !noValidate });
   const merged = mergeEntries(entries);
-  const output = formatNewReleases(merged, errors);
-  console.log(output);
+  const { text, linkMap } = formatNewReleases(merged, errors);
+  console.log(text);
+  if (linkMap.size > 0) {
+    await runClipboardPrompt(linkMap, false);
+  }
 }
 
 async function main(): Promise<void> {
