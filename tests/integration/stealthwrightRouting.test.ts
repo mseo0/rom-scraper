@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Source } from '../../src/types';
 import { TARGET_SOURCES } from '../../src/sources';
 
 vi.mock('axios', async (importOriginal) => {
@@ -40,11 +39,12 @@ describe('Stealthwright Routing Integration', () => {
     mockedStealthwright.mockReturnValue({ launch: mockLaunch } as any);
   });
 
-  it('should use Stealthwright for FMHY (requiresJs: true)', async () => {
-    const fmhy = TARGET_SOURCES.find((s) => s.name === 'FMHY')!;
-    expect(fmhy.requiresJs).toBe(true);
+  it('should use Stealthwright for Ziperto (requiresJs: true)', async () => {
+    const ziperto = TARGET_SOURCES.find((s) => s.name === 'Ziperto')!;
+    expect(ziperto).toBeDefined();
+    expect(ziperto.requiresJs).toBe(true);
 
-    await fetchSource(fmhy);
+    await fetchSource(ziperto);
 
     expect(mockedStealthwright).toHaveBeenCalled();
     expect(mockedAxios.get).not.toHaveBeenCalled();
@@ -68,7 +68,6 @@ describe('Stealthwright Routing Integration', () => {
     for (const source of TARGET_SOURCES) {
       vi.clearAllMocks();
 
-      // Re-setup stealthwright mock after clearAllMocks
       const mockPage = {
         goto: vi.fn(),
         content: vi.fn().mockResolvedValue('<html><body><a href="https://example.com/game.nsp">Game</a></body></html>'),

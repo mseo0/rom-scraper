@@ -1,26 +1,19 @@
 # rom-scraper
 
-A CLI tool that scrapes multiple Nintendo Switch ROM sources and displays download links in a formatted table. Supports single-pass scraping, deep-link two-step scraping, and multi-layer scraping (catalog → detail page → file host links).
+A CLI tool that scrapes Nintendo Switch ROM sources and displays download links with file host names. Uses a multi-layer scraping pipeline: catalog page → detail page → file host link extraction.
 
 ## Sources
 
-### Single-pass sources
-- FMHY
-- RetrogradosGaming
-- NSWTL
-- Romenix
-
-### Multi-layer sources
-These sources use a catalog → detail page → file host pipeline. The scraper follows links from the catalog to individual game pages, then extracts download links from recognized file hosting services.
-
-- notUltraNX — `not.ultranx.ru/en`
-- NXBrew — `nxbrew.net`
-- SwitchGamesMall — `switchgamesmall.icu`
-- Ziperto — `ziperto.com` (requires JS rendering)
+| Source | URL | JS Required |
+|--------|-----|-------------|
+| notUltraNX | not.ultranx.ru | No |
+| NXBrew | nxbrew.net | No |
+| SwitchGamesMall | smallgames.ch | No |
+| Ziperto | ziperto.com | Yes (Cloudflare) |
 
 ### Recognized file hosts
 
-Mega, Google Drive, MediaFire, 1fichier, MegaUp, SendCM, DooDrive, Uptobox, Gofile, Pixeldrain, KrakenFiles, Buzzheavier
+Mega, Google Drive, MediaFire, 1fichier, MegaUp, SendCM, DooDrive, Uptobox, Gofile, Pixeldrain, KrakenFiles, Buzzheavier, notUltraNX API
 
 Link shorteners and ad gates (bit.ly, adf.ly, ouo.io, linkvertise.com, etc.) are automatically filtered out.
 
@@ -48,64 +41,40 @@ Scrape all sources and display every result:
 rom-scraper
 ```
 
-Search for a specific game:
+Search for a specific game across all sources:
 
 ```bash
 rom-scraper --search "zelda"
 ```
 
+When `--search` is used, each source's native search is queried directly instead of scraping the front page. This means you can find any game the site has, not just what's on the first page.
+
 ### Search examples
 
 ```bash
-# Case-insensitive, matches partial names
 rom-scraper --search "mario"
 rom-scraper --search "metroid"
-
-# Multi-word queries work as a single substring match
 rom-scraper --search "fire emblem"
 ```
 
 ### Output
 
-Games from multi-layer sources show all available file host links:
-
 ```
-Found 3 result(s) for 'zelda':
+Found 1 result(s) for 'metroid':
 
-┌───┬──────────────────────────┬──────────┬──────────────────────────────────────────────┐
-│ # │ Game Name                │ Source   │ Download URL                                 │
-├───┼──────────────────────────┼──────────┼──────────────────────────────────────────────┤
-│ 1 │ Zelda: TOTK              │ Ziperto  │ [Mega] https://mega.nz/file/abc123           │
-│   │                          │          │ [1fichier] https://1fichier.com/?xyz          │
-│   │                          │          │ [MediaFire] https://mediafire.com/file/abc    │
-├───┼──────────────────────────┼──────────┼──────────────────────────────────────────────┤
-│ 2 │ Zelda: Links Awakening   │ FMHY     │ [Direct Download] https://example.com/z.nsp  │
-└───┴──────────────────────────┴──────────┴──────────────────────────────────────────────┘
+┌───┬──────────────────────────┬────────────┬──────────────────────────────────────────────────────┐
+│ # │ Game Name                │ Source     │ Download URL                                         │
+├───┼──────────────────────────┼────────────┼──────────────────────────────────────────────────────┤
+│ 1 │ Metroid Prime™ 4: Beyond │ notUltraNX │ [notUltraNX] https://api.ultranx.ru/games/download/…│
+│   │                          │            │ [notUltraNX] https://api.ultranx.ru/games/download/…│
+│   │                          │            │ [notUltraNX] https://api.ultranx.ru/games/download/…│
+└───┴──────────────────────────┴────────────┴──────────────────────────────────────────────────────┘
 ```
-
-When no results match:
-
-```
-No games found matching 'nonexistent game'.
-```
-
-## Architecture
-
-The scraper uses three pipeline types depending on the source:
-
-1. **Single-pass** — Fetches one page, extracts download links directly
-2. **Deep-link** — Fetches a listing page, follows links to detail pages, extracts downloads
-3. **Multi-layer** — Fetches a catalog page, follows links to detail pages, extracts file host links through a domain registry, filters out intermediaries
-
-Each source has a dedicated parser in `src/parsers/` that handles its specific HTML structure. The file host registry (`src/fileHosts.ts`) recognizes download destinations by domain rather than file extension.
 
 ## Development
 
 ```bash
-# Run tests
 npm test
-
-# Build
 npm run build
 ```
 
@@ -113,3 +82,4 @@ npm run build
 
 - Node.js 18+
 - npm
+- Google Chrome (for JS-rendered sources)
