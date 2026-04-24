@@ -29,6 +29,31 @@ export function parseArgs(argv: string[]): CliArgs {
   // Strip node and script path
   const args = argv.slice(2);
 
+  // --help / -h
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+  rom-scraper [options] [query]
+
+  Search:
+    rom-scraper <query>              Search by game name
+    rom-scraper -s <query>           Search (explicit flag)
+    rom-scraper                      Interactive search mode
+
+  Commands:
+    --new                            Browse recently added games
+    --ping                           Check if sources are reachable
+
+  Validation:
+    -nv, --no-validate               Skip link validation (one-off)
+    -nv off                          Disable validation persistently
+    -nv on                           Re-enable validation persistently
+
+  Other:
+    -h, --help                       Show this help message
+`);
+    process.exit(0);
+  }
+
   const hasNew = args.includes('--new');
   const hasPing = args.includes('--ping');
 
@@ -127,6 +152,16 @@ function prompt(question: string): Promise<string> {
   });
 }
 
+// Alternate screen buffer helpers
+function enterAltScreen(): void {
+  process.stdout.write('\x1b[?1049h');
+  process.stdout.write('\x1b[H'); // move cursor to top-left
+}
+
+function leaveAltScreen(): void {
+  process.stdout.write('\x1b[?1049l');
+}
+
 export async function runClipboardPrompt(
   linkMap: Map<number, string>,
   isInteractive: boolean,
@@ -170,10 +205,18 @@ async function runSearch(query: string, noValidate: boolean = false): Promise<vo
   const merged = mergeEntries(entries);
   const filtered = searchGames(query, merged);
   const { text, linkMap } = formatSearchResults(filtered, query, errors);
+
+  enterAltScreen();
+  const sigintHandler = () => { leaveAltScreen(); process.exit(0); };
+  process.on('SIGINT', sigintHandler);
+
   console.log(text);
   if (linkMap.size > 0) {
     await runClipboardPrompt(linkMap, false);
   }
+
+  process.removeListener('SIGINT', sigintHandler);
+  leaveAltScreen();
 }
 
 async function interactiveMode(noValidate: boolean = false): Promise<void> {
@@ -203,10 +246,35 @@ async function interactiveMode(noValidate: boolean = false): Promise<void> {
     const merged = mergeEntries(entries);
     const filtered = searchGames(query, merged);
     const { text, linkMap } = formatSearchResults(filtered, query, errors);
-    console.log(text);
-    if (linkMap.size > 0) {
-      await runClipboardPrompt(linkMap, true);
+
+    // Show results on alternate screen so exiting returns to the search prompt
+    enterAltScreen();
+    let onAltScreen = true;
+
+    const exitAltScreen = () => {
+      if (onAltScreen) {
+        onAltScreen = false;
+        leaveAltScreen();
+      }
+    };
+
+    // Ctrl+C while on alt screen returns to search prompt
+    const sigintHandler = () => { exitAltScreen(); };
+    process.on('SIGINT', sigintHandler);
+
+    try {
+      console.log(text);
+      if (linkMap.size > 0) {
+        await runClipboardPrompt(linkMap, true);
+      } else {
+        await prompt(dim('\n  Press Enter to go back...'));
+      }
+    } catch {
+      // Interrupted — fall through
     }
+
+    process.removeListener('SIGINT', sigintHandler);
+    exitAltScreen();
 
     console.log('');
   }
@@ -216,10 +284,18 @@ async function runNewReleases(noValidate: boolean = false): Promise<void> {
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, null, true, { validate: !noValidate });
   const merged = mergeEntries(entries);
   const { text, linkMap } = formatNewReleases(merged, errors);
+
+  enterAltScreen();
+  const sigintHandler = () => { leaveAltScreen(); process.exit(0); };
+  process.on('SIGINT', sigintHandler);
+
   console.log(text);
   if (linkMap.size > 0) {
     await runClipboardPrompt(linkMap, false);
   }
+
+  process.removeListener('SIGINT', sigintHandler);
+  leaveAltScreen();
 }
 
 async function main(): Promise<void> {

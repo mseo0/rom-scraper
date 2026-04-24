@@ -176,6 +176,8 @@ Copy link #:
 
 You can copy multiple links in a row. Type `q`, `quit`, `exit`, or press Enter to leave the prompt and return to search (interactive mode) or exit (direct mode).
 
+Results are displayed on an alternate screen buffer — when you leave the results (exit the clipboard prompt or press Ctrl+C), the terminal restores to its previous state with no leftover output.
+
 Download labels:
 - **Base Game** — the main game file
 - **Update** — latest game update/patch
@@ -193,6 +195,7 @@ Download labels:
 | `--no-validate`, `-nv` | Skip dead link validation (one-off) |
 | `-nv off` | Disable link validation persistently |
 | `-nv on` | Re-enable link validation persistently |
+| `-h`, `--help` | Show help message |
 
 Flags are mutually exclusive. You can't combine `--new`, `--ping`, or a search query.
 
