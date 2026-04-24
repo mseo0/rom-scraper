@@ -18,6 +18,7 @@ export interface CliArgs {
   searchQuery: string | null;
   newReleases: boolean;
   ping: boolean;
+  noValidate: boolean;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -26,6 +27,7 @@ export function parseArgs(argv: string[]): CliArgs {
 
   const hasNew = args.includes('--new');
   const hasPing = args.includes('--ping');
+  const hasNoValidate = args.includes('--no-validate');
 
   // Check for --search or -s flag
   let searchIndex = args.indexOf('--search');
@@ -40,7 +42,7 @@ export function parseArgs(argv: string[]): CliArgs {
     searchQuery = nextArg;
   } else {
     // Bare arguments (excluding --new, --ping, -s) become the search query
-    const bareArgs = args.filter(a => a !== '--new' && a !== '--ping' && a !== '-s');
+    const bareArgs = args.filter(a => a !== '--new' && a !== '--ping' && a !== '-s' && a !== '--no-validate');
     if (bareArgs.length > 0) {
       const query = bareArgs.join(' ').trim();
       if (query) searchQuery = query;
@@ -63,7 +65,12 @@ export function parseArgs(argv: string[]): CliArgs {
     process.exit(1);
   }
 
-  return { searchQuery, newReleases: hasNew, ping: hasPing };
+  if (hasNoValidate && hasPing) {
+    console.error('Error: --no-validate and --ping cannot be used together.');
+    process.exit(1);
+  }
+
+  return { searchQuery, newReleases: hasNew, ping: hasPing, noValidate: hasNoValidate };
 }
 
 function prompt(question: string): Promise<string> {
@@ -79,15 +86,15 @@ function prompt(question: string): Promise<string> {
   });
 }
 
-async function runSearch(query: string): Promise<void> {
-  const { entries, errors } = await scrapeAll(TARGET_SOURCES, query);
+async function runSearch(query: string, noValidate: boolean = false): Promise<void> {
+  const { entries, errors } = await scrapeAll(TARGET_SOURCES, query, false, { validate: !noValidate });
   const merged = mergeEntries(entries);
   const filtered = searchGames(query, merged);
   const output = formatSearchResults(filtered, query, errors);
   console.log(output);
 }
 
-async function interactiveMode(): Promise<void> {
+async function interactiveMode(noValidate: boolean = false): Promise<void> {
   console.log('');
   console.log(bold(cyan('  rom-scraper')));
   console.log(dim('  Nintendo Switch ROM search tool'));
@@ -110,32 +117,32 @@ async function interactiveMode(): Promise<void> {
     console.log(yellow(`  Searching for "${query}"...`));
     console.log('');
 
-    await runSearch(query);
+    await runSearch(query, noValidate);
 
     console.log('');
   }
 }
 
-async function runNewReleases(): Promise<void> {
-  const { entries, errors } = await scrapeAll(TARGET_SOURCES, null, true);
+async function runNewReleases(noValidate: boolean = false): Promise<void> {
+  const { entries, errors } = await scrapeAll(TARGET_SOURCES, null, true, { validate: !noValidate });
   const merged = mergeEntries(entries);
   const output = formatNewReleases(merged, errors);
   console.log(output);
 }
 
 async function main(): Promise<void> {
-  const { searchQuery, newReleases, ping } = parseArgs(process.argv);
+  const { searchQuery, newReleases, ping, noValidate } = parseArgs(process.argv);
 
   if (ping) {
     await runPingCommand(TARGET_SOURCES);
   } else if (newReleases) {
-    await runNewReleases();
+    await runNewReleases(noValidate);
   } else if (searchQuery !== null) {
     // Direct search mode (rom-scraper zelda / rom-scraper --search zelda)
-    await runSearch(searchQuery);
+    await runSearch(searchQuery, noValidate);
   } else {
     // Interactive mode (just rom-scraper)
-    await interactiveMode();
+    await interactiveMode(noValidate);
   }
 }
 

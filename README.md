@@ -186,7 +186,7 @@ Flags are mutually exclusive. You can't combine `--new`, `--ping`, or a search q
 | Source | URL | Notes |
 |--------|-----|-------|
 | notUltraNX | `https://not.ultranx.ru/en` | Clean HTML, direct API downloads, free account required |
-| NXBrew | `https://nxbrew.net/` | 🚧 Work in progress — large catalog, static HTML |
+| NXBrew | `https://nxbrew.net/` | Large catalog, static HTML, file host links (1fichier, Mega, etc.) |
 
 ## Dependencies
 
@@ -231,4 +231,13 @@ src/
 
 ## Disclaimer
 
-This tool is for educational and personal use. The developers are not responsible for how you use it. Respect the terms of service of the sites being scraped.
+This tool is for educational and personal use only. The developers are not responsible for how you use it. Respect the terms of service of the sites being scraped.
+
+### Source Reliability
+
+- **Links can go dead at any time.** File hosts regularly remove content due to DMCA takedowns, inactivity, or abuse reports. A link that works today may not work tomorrow.
+- **No guarantees on file integrity.** This tool scrapes links from third-party sites. It does not verify that downloaded files are safe, complete, or free of malware. Always scan downloads with antivirus software.
+- **Source sites change without notice.** ROM catalog sites frequently change their HTML structure, domains, or access requirements. This can break scraping at any time. Run `rom-scraper --ping` to check source availability.
+- **Results vary by source.** Different sources may list different games, use different naming conventions, or have different link quality. Cross-source merging is best-effort based on game name similarity.
+- **File host availability varies by region.** Some file hosts may be blocked or throttled in certain countries. If a download link doesn't work, try a different source or host.
+- **This tool does not host or distribute any files.** It only aggregates publicly available links from third-party websites.

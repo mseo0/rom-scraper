@@ -5,8 +5,18 @@ import { parseSource, getSourceParser } from './parser';
 import { getUltraNXToken } from './auth';
 import axios from 'axios';
 import { startSpinner, stopSpinner, reportComplete } from './progress';
+import { validateLinks } from './validator';
 
-export async function scrapeAll(sources: Source[], searchQuery?: string | null, newReleases?: boolean): Promise<{entries: GameEntry[], errors: string[]}> {
+export interface ScrapeOptions {
+  validate?: boolean;
+}
+
+export async function scrapeAll(
+  sources: Source[],
+  searchQuery?: string | null,
+  newReleases?: boolean,
+  options?: ScrapeOptions
+): Promise<{entries: GameEntry[], errors: string[]}> {
   const allEntries: GameEntry[] = [];
   const allErrors: string[] = [];
   let index = 1;
@@ -105,6 +115,15 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null, 
             downloadLinks = resolved;
           }
 
+          // Validate download links (unless --no-validate)
+          if (options?.validate !== false && downloadLinks.length > 0) {
+            startSpinner(source.name, `validating ${downloadLinks.length} links`);
+            const liveLinks = await validateLinks(downloadLinks);
+            const deadCount = downloadLinks.length - liveLinks.length;
+            stopSpinner('✓', source.name, `validated: ${liveLinks.length} live, ${deadCount} dead`);
+            downloadLinks = liveLinks;
+          }
+
           if (downloadLinks.length > 0) {
             const entry: GameEntry = {
               index: index++,
@@ -155,6 +174,18 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null, 
         if (!entry.downloadLinks || entry.downloadLinks.length === 0) {
           entry.downloadLinks = [{ url: entry.downloadUrl, hostName: 'Direct Download' }];
         }
+
+        // Validate download links (unless --no-validate)
+        if (options?.validate !== false && entry.downloadLinks.length > 0) {
+          startSpinner(source.name, `validating ${entry.downloadLinks.length} links`);
+          const liveLinks = await validateLinks(entry.downloadLinks);
+          const deadCount = entry.downloadLinks.length - liveLinks.length;
+          stopSpinner('✓', source.name, `validated: ${liveLinks.length} live, ${deadCount} dead`);
+          entry.downloadLinks = liveLinks;
+          if (liveLinks.length === 0) continue; // Skip entry if all links are dead
+          entry.downloadUrl = liveLinks[0].url; // Update downloadUrl to first live link
+        }
+
         allEntries.push(entry);
       }
     }

@@ -42,6 +42,12 @@ function tryParseUrl(url: string): URL | null {
   }
 }
 
+/** Known non-download paths on file host domains (abuse pages, terms, etc.) */
+const REJECTED_PATHS: string[] = [
+  '/abuse', '/terms', '/about', '/contact', '/privacy', '/dmca',
+  '/tos', '/faq', '/help', '/login', '/register', '/signup',
+];
+
 /**
  * Check if a URL's domain matches a registered file host.
  * Supports subdomain matching: hostname `nz.mega.nz` matches registered domain `mega.nz`
@@ -52,12 +58,21 @@ function tryParseUrl(url: string): URL | null {
  *
  * Rejects known false-positive patterns:
  * - 1fichier.com affiliate-only links (only ?af=... with no file ID)
+ * - Non-download paths on file host domains (/abuse, /terms, etc.)
  */
 export function matchFileHost(url: string): DownloadLink | null {
   const parsed = tryParseUrl(url);
   if (!parsed) return null;
 
   const hostname = parsed.hostname.toLowerCase();
+  const pathname = parsed.pathname.toLowerCase();
+
+  // Reject known non-download paths (abuse pages, terms, etc.)
+  for (const rejected of REJECTED_PATHS) {
+    if (pathname === rejected || pathname === rejected + '/') {
+      return null;
+    }
+  }
 
   for (const [domain, hostName] of FILE_HOST_DOMAINS) {
     if (hostname === domain || hostname.endsWith('.' + domain)) {
@@ -72,10 +87,6 @@ export function matchFileHost(url: string): DownloadLink | null {
         if (keys.length === 1 && keys[0] === 'af') {
           return null;
         }
-        // If there are no query params at all, it's just the homepage
-        if (keys.length === 0 && !parsed.search) {
-          return null;
-        }
       }
 
       return { url, hostName };
@@ -83,7 +94,6 @@ export function matchFileHost(url: string): DownloadLink | null {
   }
 
   // Check for known ROM file extensions
-  const pathname = parsed.pathname.toLowerCase();
   for (const ext of ROM_EXTENSIONS) {
     if (pathname.endsWith(ext)) {
       return { url, hostName: 'Direct Download' };
