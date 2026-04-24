@@ -17,7 +17,7 @@ describe('parseArgs', () => {
     errorSpy.mockRestore();
   });
 
-  it('returns searchQuery as null when no flags are provided', () => {
+  it('returns searchQuery as null when no args are provided', () => {
     const result = parseArgs(['node', 'script.js']);
     expect(result).toEqual({ searchQuery: null });
   });
@@ -37,5 +37,20 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['node', 'script.js', '--search', '  '])).toThrow('process.exit called');
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(errorSpy).toHaveBeenCalledWith('Error: --search requires a search term.');
+  });
+
+  it('treats bare arguments as the search query', () => {
+    const result = parseArgs(['node', 'script.js', 'zelda']);
+    expect(result).toEqual({ searchQuery: 'zelda' });
+  });
+
+  it('joins multiple bare arguments into a single search query', () => {
+    const result = parseArgs(['node', 'script.js', 'fire', 'emblem']);
+    expect(result).toEqual({ searchQuery: 'fire emblem' });
+  });
+
+  it('prefers --search flag over bare arguments', () => {
+    const result = parseArgs(['node', 'script.js', '--search', 'zelda', 'mario']);
+    expect(result).toEqual({ searchQuery: 'zelda' });
   });
 });

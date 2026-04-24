@@ -41,15 +41,41 @@ export async function fetchStatic(url: string): Promise<string> {
 }
 
 export async function fetchWithBrowser(url: string): Promise<string> {
-  const browser = await stealthwright().launch({ headless: true });
+  // Suppress stealthwright/Chrome debug output on stderr and stdout
+  const origStderrWrite = process.stderr.write;
+  const origStdoutWrite = process.stdout.write;
+  process.stderr.write = (() => true) as any;
+  const suppressStdout = (chunk: any, ...args: any[]) => {
+    const str = typeof chunk === 'string' ? chunk : chunk?.toString?.() || '';
+    // Suppress stealthwright noise but allow our own output through
+    if (str.includes('browser executable') || str.includes('Chrome') ||
+        str.includes('Launching') || str.includes('Connected to') ||
+        str.includes('Navigating to') || str.includes('Successfully navigated') ||
+        str.includes('Browser closed') || str.includes('WebSocket') ||
+        str.includes('Browser process') || str.includes('Using existing') ||
+        str.includes('Error removing user data')) {
+      return true;
+    }
+    return origStdoutWrite.apply(process.stdout, [chunk, ...args] as any);
+  };
+  process.stdout.write = suppressStdout as any;
+
   try {
-    const context = browser.defaultBrowserContext();
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    const html = await page.content();
-    return html;
+    const browser = await stealthwright().launch({ headless: true });
+    try {
+      const context = browser.defaultBrowserContext();
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+      const html = await page.content();
+      return html;
+    } finally {
+      await browser.close();
+      // Wait briefly for async browser cleanup (process exit, WebSocket close)
+      await new Promise((r) => setTimeout(r, 500));
+    }
   } finally {
-    await browser.close();
+    process.stderr.write = origStderrWrite;
+    process.stdout.write = origStdoutWrite;
   }
 }
 

@@ -53,7 +53,7 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
 
       // 4. If no game links found, log and continue
       if (uniqueLinks.length === 0) {
-        console.log(`No game links found on ${source.name}`);
+        process.stdout.write(`  \x1b[2m${source.name} → no results\x1b[0m\n`);
         continue;
       }
 
@@ -104,7 +104,7 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
       const parser = getDeepLinkParser(source.name);
       if (!parser) {
         const msg = `No deep link parser for ${source.name}`;
-        console.log(msg);
+        process.stdout.write(`  \x1b[2m${msg}\x1b[0m\n`);
         allErrors.push(msg);
         continue;
       }
@@ -125,7 +125,7 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
 
       // 5. If no game links found, log and continue
       if (uniqueLinks.length === 0) {
-        console.log(`No game links found on ${source.name}`);
+        process.stdout.write(`  \x1b[2m${source.name} → no game links\x1b[0m\n`);
         continue;
       }
 
@@ -178,7 +178,7 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
 
       // 6. If message (no links found), log it
       if (parseResult.message) {
-        console.log(parseResult.message);
+        process.stdout.write(`  \x1b[2m${parseResult.message}\x1b[0m\n`);
       }
 
       // 7. Add entries with sequential index

@@ -227,7 +227,7 @@ describe('scrapeAll — multi-layer pipeline', () => {
 
   // --- Requirement 9.2: Source with no registered parser logs warning and skips ---
   it('logs warning and skips source with no registered parser (single-pass fallthrough)', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     mockedFetchSource.mockResolvedValueOnce(makeFetchOk(unregisteredSource, '<html>unknown</html>'));
     mockedParseSource.mockReturnValueOnce(
@@ -237,10 +237,11 @@ describe('scrapeAll — multi-layer pipeline', () => {
     const result = await scrapeAll([unregisteredSource]);
 
     // Falls through to single-pass, which logs "Unknown source"
-    expect(consoleSpy).toHaveBeenCalledWith(`Unknown source: ${unregisteredSource.name}`);
+    const output = stdoutSpy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain(`Unknown source: ${unregisteredSource.name}`);
     expect(result.entries).toHaveLength(0);
 
-    consoleSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 
   // --- Requirement 8.1: Catalog page fetch failure records error and continues ---

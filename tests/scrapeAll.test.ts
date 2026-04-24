@@ -79,15 +79,16 @@ describe('scrapeAll', () => {
   });
 
   it('should log message when no links found on a source', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     mockedFetch.mockResolvedValueOnce(makeFetchOk(sourceA, '<html>empty</html>'));
     mockedParse.mockReturnValueOnce(makeParseResult(sourceA, [], 'No .nsp files found on SourceA'));
 
     const result = await scrapeAll([sourceA]);
 
     expect(result.entries).toHaveLength(0);
-    expect(consoleSpy).toHaveBeenCalledWith('No .nsp files found on SourceA');
-    consoleSpy.mockRestore();
+    const output = stdoutSpy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('No .nsp files found on SourceA');
+    stdoutSpy.mockRestore();
   });
 
   it('should call progress reporters in correct order', async () => {
@@ -124,7 +125,7 @@ describe('scrapeAll', () => {
   });
 
   it('should return empty entries when all sources succeed but find no .nsp links', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     mockedFetch.mockResolvedValueOnce(makeFetchOk(sourceA, '<html>no links</html>'));
     mockedFetch.mockResolvedValueOnce(makeFetchOk(sourceB, '<html>no links</html>'));
     mockedParse.mockReturnValueOnce(makeParseResult(sourceA, [], 'No .nsp files found on SourceA'));
@@ -134,9 +135,10 @@ describe('scrapeAll', () => {
 
     expect(result.entries).toHaveLength(0);
     expect(result.errors).toHaveLength(0);
-    expect(consoleSpy).toHaveBeenCalledWith('No .nsp files found on SourceA');
-    expect(consoleSpy).toHaveBeenCalledWith('No .nsp files found on SourceB');
+    const output = stdoutSpy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('No .nsp files found on SourceA');
+    expect(output).toContain('No .nsp files found on SourceB');
     expect(mockedReportComplete).toHaveBeenCalled();
-    consoleSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 });

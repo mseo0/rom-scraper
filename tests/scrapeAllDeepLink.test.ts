@@ -244,7 +244,7 @@ describe('scrapeAll — deep link branch', () => {
 
   // --- Test 6: Missing deep link parser → logs error, skips source ---
   it('logs error and skips source when deep link parser is missing', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     mockedFetchSource.mockResolvedValueOnce(makeFetchOk(deepSource, '<html>listing</html>'));
     mockedGetDeepLinkParser.mockReturnValue(undefined);
@@ -253,17 +253,18 @@ describe('scrapeAll — deep link branch', () => {
 
     expect(result.entries).toHaveLength(0);
     expect(result.errors).toContain('No deep link parser for DeepSource');
-    expect(consoleSpy).toHaveBeenCalledWith('No deep link parser for DeepSource');
+    const output = stdoutSpy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('No deep link parser for DeepSource');
 
     // Should not attempt to fetch detail pages
     expect(mockedFetchDetailPages).not.toHaveBeenCalled();
 
-    consoleSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 
   // --- Test 7: No game links found → logs message, continues ---
   it('logs message and continues when no game links found', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     const mockParser = makeMockDeepLinkParser([], () => null);
 
@@ -273,12 +274,13 @@ describe('scrapeAll — deep link branch', () => {
     const result = await scrapeAll([deepSource]);
 
     expect(result.entries).toHaveLength(0);
-    expect(consoleSpy).toHaveBeenCalledWith('No game links found on DeepSource');
+    const output = stdoutSpy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('DeepSource');
 
     // Should not attempt to fetch detail pages
     expect(mockedFetchDetailPages).not.toHaveBeenCalled();
 
-    consoleSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 
   // --- Test 8: Mixed sources produce sequential indices ---

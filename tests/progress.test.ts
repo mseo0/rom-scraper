@@ -1,49 +1,67 @@
-import { describe, it, expect, vi } from 'vitest';
-import { reportFetching, reportParsing, reportComplete, reportExtractingLinks, reportFetchingDetails, reportExtractingDownloads } from '../src/progress';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Source } from '../src/types';
+import {
+  reportFetching,
+  reportParsing,
+  reportComplete,
+  reportExtractingLinks,
+  reportFetchingDetails,
+  reportExtractingDownloads,
+} from '../src/progress';
+
+const source: Source = { url: 'https://example.com', name: 'TestSource', requiresJs: false };
 
 describe('progress reporter', () => {
-  const source: Source = { url: 'https://example.com', name: 'TestSource', requiresJs: false };
+  let spy: ReturnType<typeof vi.spyOn>;
 
-  it('reportFetching logs source name and URL', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  afterEach(() => {
+    spy?.mockRestore();
+  });
+
+  it('reportFetching writes source name', () => {
+    spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     reportFetching(source);
-    expect(spy).toHaveBeenCalledWith('Fetching TestSource (https://example.com)...');
-    spy.mockRestore();
+    const output = spy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('TestSource');
+    expect(output).toContain('fetching');
   });
 
-  it('reportParsing logs source name', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('reportParsing writes source name', () => {
+    spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     reportParsing(source);
-    expect(spy).toHaveBeenCalledWith('Parsing TestSource for .nsp links...');
-    spy.mockRestore();
+    const output = spy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('TestSource');
+    expect(output).toContain('parsing');
   });
 
-  it('reportComplete logs completion message', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('reportComplete writes done message', () => {
+    spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     reportComplete();
-    expect(spy).toHaveBeenCalledWith('Scraping complete.');
-    spy.mockRestore();
+    const output = spy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('Done');
   });
 
-  it('reportExtractingLinks logs source name', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('reportExtractingLinks writes source name', () => {
+    spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     reportExtractingLinks(source);
-    expect(spy).toHaveBeenCalledWith('Extracting game links from TestSource...');
-    spy.mockRestore();
+    const output = spy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('TestSource');
+    expect(output).toContain('extracting game links');
   });
 
-  it('reportFetchingDetails logs source name and count', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('reportFetchingDetails writes source name and count', () => {
+    spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     reportFetchingDetails(source, 5);
-    expect(spy).toHaveBeenCalledWith('Fetching 5 detail pages from TestSource...');
-    spy.mockRestore();
+    const output = spy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('TestSource');
+    expect(output).toContain('5 detail pages');
   });
 
-  it('reportExtractingDownloads logs source name', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  it('reportExtractingDownloads writes source name', () => {
+    spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     reportExtractingDownloads(source);
-    expect(spy).toHaveBeenCalledWith('Extracting download URLs from TestSource...');
-    spy.mockRestore();
+    const output = spy.mock.calls.map(c => String(c[0])).join('');
+    expect(output).toContain('TestSource');
+    expect(output).toContain('extracting downloads');
   });
 });
