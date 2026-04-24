@@ -19,7 +19,7 @@
     "axios": "^1.15.2",
     "cheerio": "^1.2.0",
     "cli-table3": "^0.6.5",
-    "puppeteer": "^24.42.0"
+    "stealthwright": "latest"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",

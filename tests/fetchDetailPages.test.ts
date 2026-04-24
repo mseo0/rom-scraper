@@ -11,14 +11,18 @@ vi.mock('axios', async (importOriginal) => {
     },
   };
 });
-vi.mock('puppeteer');
+vi.mock('stealthwright', () => ({
+  stealthwright: vi.fn(() => ({
+    launch: vi.fn()
+  }))
+}));
 
 import axios from 'axios';
-import puppeteer from 'puppeteer';
+import { stealthwright } from 'stealthwright';
 import { fetchDetailPages } from '../src/fetcher';
 
 const mockedAxios = vi.mocked(axios);
-const mockedPuppeteer = vi.mocked(puppeteer);
+const mockedStealthwright = vi.mocked(stealthwright);
 
 const staticSource: Source = { url: 'https://example.com', name: 'Example', requiresJs: false };
 const jsSource: Source = { url: 'https://js-example.com', name: 'JsExample', requiresJs: true };
@@ -117,16 +121,19 @@ describe('fetchDetailPages', () => {
     expect(mockedAxios.get).toHaveBeenCalledWith(gameLinks[0].url, { timeout: 30000 });
   });
 
-  it('should use puppeteer (browser fetch) for JS source', async () => {
+  it('should use stealthwright (browser fetch) for JS source', async () => {
     const gameLinks = makeGameLinks(1);
     const mockPage = { goto: vi.fn(), content: vi.fn().mockResolvedValue('<html>rendered</html>') };
-    const mockBrowser = { newPage: vi.fn().mockResolvedValue(mockPage), close: vi.fn() };
-    mockedPuppeteer.launch = vi.fn().mockResolvedValue(mockBrowser);
+    const newPage = vi.fn().mockResolvedValue(mockPage);
+    const mockBrowser = { defaultBrowserContext: () => ({ newPage }), close: vi.fn() };
+    const mockLaunch = vi.fn().mockResolvedValue(mockBrowser);
+    mockedStealthwright.mockReturnValue({ launch: mockLaunch } as any);
 
     const results = await fetchDetailPages(gameLinks, jsSource, 1);
 
-    expect(mockedPuppeteer.launch).toHaveBeenCalled();
-    expect(mockPage.goto).toHaveBeenCalledWith(gameLinks[0].url, { waitUntil: 'networkidle2', timeout: 30000 });
+    expect(mockedStealthwright).toHaveBeenCalled();
+    expect(mockLaunch).toHaveBeenCalledWith({ headless: true });
+    expect(mockPage.goto).toHaveBeenCalledWith(gameLinks[0].url, { waitUntil: 'networkidle0', timeout: 30000 });
     expect(results[0].html).toBe('<html>rendered</html>');
     expect(results[0].error).toBeNull();
   });

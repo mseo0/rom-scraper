@@ -1,18 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FetchResult, DetailPageResult } from '../../src/types';
+import { FetchResult } from '../../src/types';
 import { TARGET_SOURCES } from '../../src/sources';
 
 // Mock only the fetcher and progress — parsers, formatter, orchestrator, and search run for real
 vi.mock('../../src/fetcher');
 vi.mock('../../src/progress');
 
-import { fetchSource, fetchDetailPages } from '../../src/fetcher';
+import { fetchSource } from '../../src/fetcher';
 import { scrapeAll } from '../../src/orchestrator';
 import { searchGames } from '../../src/search';
 import { formatSearchResults } from '../../src/formatter';
 
 const mockedFetch = vi.mocked(fetchSource);
-const mockedFetchDetailPages = vi.mocked(fetchDetailPages);
 
 /**
  * Predefined HTML for each source, reusing the same fixture data
@@ -28,37 +27,16 @@ const sourceHtml: Record<string, string> = {
     <a href="https://retro.example.com/metroid-dread.nsp">Metroid Dread</a>
   </body></html>`,
 
-  SwitchRom: `<html><body>
-    <a href="https://switchrom.example.com/splatoon3.nsp">Splatoon 3</a>
-    <a href="https://switchrom.example.com/pikmin4.nsp">Pikmin 4</a>
-  </body></html>`,
-
   NSWTL: `<html><body>
     <a href="https://nswtl.example.com/pokemon-sv.nsp">Pokemon Scarlet</a>
-  </body></html>`,
-
-  SwitchRomsOrg: `<html><body>
-    <a href="https://switchroms.example.com/kirby-forgotten.nsp">Kirby Forgotten Land</a>
-    <a href="https://switchroms.example.com/bayonetta3.nsp">Bayonetta 3</a>
-    <a href="https://switchroms.example.com/mario-kart8.nsp">Mario Kart 8</a>
   </body></html>`,
 
   Romenix: `<html><body>
     <a href="https://romenix.example.com/fire-emblem-engage.nsp">Fire Emblem Engage</a>
   </body></html>`,
-
-  NspGameHub: `<html><body>
-    <a href="https://nspgamehub.com/game/astral-chain">Astral Chain</a>
-  </body></html>`,
 };
 
-/** Detail page HTML for NspGameHub deep-link source */
-const nspGameHubDetailPages: Record<string, string> = {
-  'https://nspgamehub.com/game/astral-chain': `<html><head><title>Astral Chain</title></head><body>
-    <h1>Astral Chain</h1>
-    <a href="https://dl.nspgamehub.com/astral-chain.nsp">Download</a>
-  </body></html>`,
-};
+
 
 function setupFetchMock() {
   mockedFetch.mockImplementation(async (s) => {
@@ -74,18 +52,6 @@ function setupFetchMock() {
 describe('Search Pipeline Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock fetchDetailPages for the NspGameHub deep-link source
-    mockedFetchDetailPages.mockImplementation(async (gameLinks) => {
-      return gameLinks.map((gl) => {
-        const html = nspGameHubDetailPages[gl.url] ?? null;
-        return {
-          gameLink: gl,
-          html,
-          error: html ? null : `Failed to fetch ${gl.url}`,
-        } as DetailPageResult;
-      });
-    });
   });
 
   it('should filter results to only matching entries for a search query', async () => {
@@ -102,14 +68,9 @@ describe('Search Pipeline Integration', () => {
 
     // Non-matching games must NOT appear
     expect(output).not.toContain('Metroid Dread');
-    expect(output).not.toContain('Splatoon 3');
-    expect(output).not.toContain('Pikmin 4');
     expect(output).not.toContain('Pokemon Scarlet');
-    expect(output).not.toContain('Kirby Forgotten Land');
-    expect(output).not.toContain('Bayonetta 3');
     expect(output).not.toContain('Fire Emblem Engage');
     expect(output).not.toContain('Mario Wonder');
-    expect(output).not.toContain('Mario Kart 8');
 
     // Filtered entries should be re-indexed starting from 1
     filtered.forEach((entry, i) => {
@@ -135,19 +96,15 @@ describe('Search Pipeline Integration', () => {
     const filtered = searchGames('mario', entries);
     const output = formatSearchResults(filtered, 'mario', errors);
 
-    // "Mario Wonder" from FMHY and "Mario Kart 8" from SwitchRomsOrg
-    expect(filtered).toHaveLength(2);
-    expect(output).toContain("Found 2 result(s) for 'mario':");
+    // "Mario Wonder" from FMHY (only match now)
+    expect(filtered).toHaveLength(1);
+    expect(output).toContain("Found 1 result(s) for 'mario':");
     expect(output).toContain('Mario Wonder');
-    expect(output).toContain('Mario Kart 8');
 
-    // Verify entries come from different sources
-    const sourceNames = filtered.map((e) => e.sourceName);
-    expect(sourceNames).toContain('FMHY');
-    expect(sourceNames).toContain('SwitchRomsOrg');
+    // Verify source
+    expect(filtered[0].sourceName).toBe('FMHY');
 
     // Re-indexed sequentially
     expect(filtered[0].index).toBe(1);
-    expect(filtered[1].index).toBe(2);
   });
 });

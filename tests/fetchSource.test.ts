@@ -11,14 +11,18 @@ vi.mock('axios', async (importOriginal) => {
     },
   };
 });
-vi.mock('puppeteer');
+vi.mock('stealthwright', () => ({
+  stealthwright: vi.fn(() => ({
+    launch: vi.fn()
+  }))
+}));
 
 import axios, { AxiosError, AxiosHeaders } from 'axios';
-import puppeteer from 'puppeteer';
+import { stealthwright } from 'stealthwright';
 import { fetchSource, buildErrorMessage } from '../src/fetcher';
 
 const mockedAxios = vi.mocked(axios);
-const mockedPuppeteer = vi.mocked(puppeteer);
+const mockedStealthwright = vi.mocked(stealthwright);
 
 function makeHttpError(status: number): AxiosError {
   const err = new AxiosError(
@@ -50,15 +54,18 @@ describe('fetchSource', () => {
     expect(result).toEqual({ source: staticSource, html: '<html>static</html>', error: null });
   });
 
-  it('should use puppeteer (browser fetch) when requiresJs is true and return html', async () => {
+  it('should use stealthwright (browser fetch) when requiresJs is true and return html', async () => {
     const mockContent = '<html>rendered</html>';
     const mockPage = { goto: vi.fn(), content: vi.fn().mockResolvedValue(mockContent) };
-    const mockBrowser = { newPage: vi.fn().mockResolvedValue(mockPage), close: vi.fn() };
-    mockedPuppeteer.launch = vi.fn().mockResolvedValue(mockBrowser);
+    const newPage = vi.fn().mockResolvedValue(mockPage);
+    const mockBrowser = { defaultBrowserContext: () => ({ newPage }), close: vi.fn() };
+    const mockLaunch = vi.fn().mockResolvedValue(mockBrowser);
+    mockedStealthwright.mockReturnValue({ launch: mockLaunch } as any);
 
     const result = await fetchSource(jsSource);
-    expect(mockedPuppeteer.launch).toHaveBeenCalledWith({ headless: true });
-    expect(mockPage.goto).toHaveBeenCalledWith(jsSource.url, { waitUntil: 'networkidle2', timeout: 30000 });
+    expect(mockedStealthwright).toHaveBeenCalled();
+    expect(mockLaunch).toHaveBeenCalledWith({ headless: true });
+    expect(mockPage.goto).toHaveBeenCalledWith(jsSource.url, { waitUntil: 'networkidle0', timeout: 30000 });
     expect(result).toEqual({ source: jsSource, html: mockContent, error: null });
   });
 
@@ -93,8 +100,9 @@ describe('fetchSource', () => {
     expect(result.error).toBe('Connection failed fetching https://example.com: ENOTFOUND');
   });
 
-  it('should return error with URL for puppeteer failures', async () => {
-    mockedPuppeteer.launch = vi.fn().mockRejectedValue(new Error('Browser crashed'));
+  it('should return error with URL for stealthwright failures', async () => {
+    const mockLaunch = vi.fn().mockRejectedValue(new Error('Browser crashed'));
+    mockedStealthwright.mockReturnValue({ launch: mockLaunch } as any);
     const result = await fetchSource(jsSource);
     expect(result.error).toBe('Error fetching https://js-example.com: Browser crashed');
   });
