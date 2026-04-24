@@ -4,6 +4,7 @@ import { TARGET_SOURCES } from './sources';
 import { scrapeAll } from './orchestrator';
 import { formatResults, formatSearchResults, formatNewReleases } from './formatter';
 import { searchGames } from './search';
+import { mergeEntries } from './merger';
 import { runPingCommand } from './ping';
 
 // ANSI color helpers
@@ -80,7 +81,8 @@ function prompt(question: string): Promise<string> {
 
 async function runSearch(query: string): Promise<void> {
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, query);
-  const filtered = searchGames(query, entries);
+  const merged = mergeEntries(entries);
+  const filtered = searchGames(query, merged);
   const output = formatSearchResults(filtered, query, errors);
   console.log(output);
 }
@@ -116,7 +118,8 @@ async function interactiveMode(): Promise<void> {
 
 async function runNewReleases(): Promise<void> {
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, null, true);
-  const output = formatNewReleases(entries, errors);
+  const merged = mergeEntries(entries);
+  const output = formatNewReleases(merged, errors);
   console.log(output);
 }
 

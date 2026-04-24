@@ -71,3 +71,16 @@ export interface DetailPageResult {
   html: string | null;
   error: string | null;
 }
+
+export interface SourceGroup {
+  sourceName: string;
+  sourceUrl: string;
+  detailPageUrl?: string;
+  downloadLinks: DownloadLink[];
+}
+
+export interface MergedEntry {
+  index: number;
+  gameName: string;
+  sourceGroups: SourceGroup[];
+}
