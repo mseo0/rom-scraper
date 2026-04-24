@@ -1,4 +1,4 @@
-import { Source, GameEntry, ParseResult, DeepLinkParser } from './types';
+import { Source, GameEntry, ParseResult, DeepLinkParser, SourceParser } from './types';
 import { parseFmhy } from './parsers/fmhy';
 import { parseRetrogrados } from './parsers/retrogrados';
 import { parseSwitchrom } from './parsers/switchrom';
@@ -6,6 +6,10 @@ import { parseNswtl } from './parsers/nswtl';
 import { parseSwitchRomsOrg } from './parsers/switchRomsOrg';
 import { parseRomenix } from './parsers/romenix';
 import { nspGameHubParser } from './parsers/nspGameHub';
+import { notUltraNXParser } from './parsers/notUltraNX';
+import { nxBrewParser } from './parsers/nxBrew';
+import { switchGamesMallParser } from './parsers/switchGamesMall';
+import { zipertoParser } from './parsers/ziperto';
 
 export const deepLinkParserMap: Record<string, DeepLinkParser> = {
   NspGameHub: nspGameHubParser,
@@ -13,6 +17,17 @@ export const deepLinkParserMap: Record<string, DeepLinkParser> = {
 
 export function getDeepLinkParser(sourceName: string): DeepLinkParser | undefined {
   return deepLinkParserMap[sourceName];
+}
+
+export const sourceParserMap: Record<string, SourceParser> = {
+  Ziperto: zipertoParser,
+  notUltraNX: notUltraNXParser,
+  NXBrew: nxBrewParser,
+  SwitchGamesMall: switchGamesMallParser,
+};
+
+export function getSourceParser(sourceName: string): SourceParser | undefined {
+  return sourceParserMap[sourceName];
 }
 
 const parserMap: Record<string, (html: string) => GameEntry[]> = {

@@ -44,18 +44,18 @@ describe('Full Pipeline Integration', () => {
 
   });
 
-  it('should scrape all 6 sources, parse entries, assign indices, and format output', async () => {
+  it('should scrape all sources, parse entries, assign indices, and format output', async () => {
     // Mock fetchSource to return predefined HTML for each source
-    for (const source of TARGET_SOURCES) {
-      mockedFetch.mockImplementation(async (s) => {
-        const html = sourceHtml[s.name];
-        return { source: s, html: html ?? null, error: html ? null : `Unknown source: ${s.name}` } as FetchResult;
-      });
-    }
+    mockedFetch.mockImplementation(async (s) => {
+      const html = sourceHtml[s.name];
+      return { source: s, html: html ?? null, error: html ? null : `Unknown source: ${s.name}` } as FetchResult;
+    });
 
-    const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+    // Use only the single-pass sources that have mock HTML
+    const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+    const { entries, errors } = await scrapeAll(singlePassSources);
 
-    // All 4 sources succeed — no errors
+    // All 4 single-pass sources succeed — no errors
     expect(errors).toHaveLength(0);
 
     // Total entries: FMHY(2) + Retrogrados(1) + NSWTL(1) + Romenix(1) = 5
@@ -97,7 +97,9 @@ describe('Full Pipeline Integration', () => {
       return { source: s, html: html ?? null, error: html ? null : `Unknown source: ${s.name}` } as FetchResult;
     });
 
-    const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+    // Use only the single-pass sources that have mock HTML
+    const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+    const { entries, errors } = await scrapeAll(singlePassSources);
     const output = formatResults(entries, errors);
 
     // Summary line shows correct total
@@ -128,19 +130,21 @@ describe('Full Pipeline Integration', () => {
     expect(output).not.toContain('Errors:');
   });
 
-  it('should fetch all 6 sources exactly once', async () => {
+  it('should fetch all sources exactly once', async () => {
     mockedFetch.mockImplementation(async (s) => {
       const html = sourceHtml[s.name];
       return { source: s, html: html ?? null, error: html ? null : `Unknown source: ${s.name}` } as FetchResult;
     });
 
-    await scrapeAll(TARGET_SOURCES);
+    // Use only the single-pass sources that have mock HTML
+    const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+    await scrapeAll(singlePassSources);
 
-    expect(mockedFetch).toHaveBeenCalledTimes(4);
+    expect(mockedFetch).toHaveBeenCalledTimes(singlePassSources.length);
 
     // Verify each source was fetched
     const fetchedUrls = mockedFetch.mock.calls.map((call) => call[0].url);
-    for (const source of TARGET_SOURCES) {
+    for (const source of singlePassSources) {
       expect(fetchedUrls).toContain(source.url);
     }
   });

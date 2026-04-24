@@ -1,6 +1,7 @@
 import { Source, GameEntry, GameLink } from './types';
+import { DownloadLink, filterDownloadLinks } from './fileHosts';
 import { fetchSource, fetchDetailPages } from './fetcher';
-import { parseSource, getDeepLinkParser } from './parser';
+import { parseSource, getDeepLinkParser, getSourceParser } from './parser';
 import {
   reportFetching,
   reportParsing,
@@ -16,8 +17,73 @@ export async function scrapeAll(sources: Source[]): Promise<{entries: GameEntry[
   let index = 1;
 
   for (const source of sources) {
-    if (source.deepLink) {
-      // === Deep link two-step pipeline ===
+    const sourceParser = getSourceParser(source.name);
+
+    if (sourceParser) {
+      // === Multi-layer pipeline (new) ===
+
+      // 1. Fetch catalog page
+      reportFetching(source);
+      const fetchResult = await fetchSource(source);
+      if (fetchResult.error) {
+        allErrors.push(fetchResult.error);
+        continue;
+      }
+
+      // 2. Extract game links via SourceParser
+      reportExtractingLinks(source);
+      const gameLinks = sourceParser.extractGameLinks(fetchResult.html!, source.url);
+
+      // 3. Deduplicate game links by URL
+      const seen = new Set<string>();
+      const uniqueLinks: GameLink[] = [];
+      for (const link of gameLinks) {
+        if (!seen.has(link.url)) {
+          seen.add(link.url);
+          uniqueLinks.push(link);
+        }
+      }
+
+      // 4. If no game links found, log and continue
+      if (uniqueLinks.length === 0) {
+        console.log(`No game links found on ${source.name}`);
+        continue;
+      }
+
+      // 5. Fetch detail pages concurrently (concurrency limit = 5)
+      reportFetchingDetails(source, uniqueLinks.length);
+      const detailResults = await fetchDetailPages(uniqueLinks, source, 5);
+
+      // 6. Collect errors from failed detail page fetches
+      for (const result of detailResults) {
+        if (result.error) {
+          allErrors.push(result.error);
+        }
+      }
+
+      // 7. Extract download links from successful detail pages
+      reportExtractingDownloads(source);
+      for (const result of detailResults) {
+        if (result.html) {
+          const extracted = sourceParser.extractDownloadLinks(result.html, result.gameLink.url);
+          const downloadLinks = filterDownloadLinks(extracted.urls);
+
+          if (downloadLinks.length > 0) {
+            const entry: GameEntry = {
+              index: index++,
+              gameName: extracted.gameName,
+              downloadLinks,
+              downloadUrl: downloadLinks[0].url,
+              sourceName: source.name,
+              sourceUrl: source.url,
+              detailPageUrl: result.gameLink.url,
+            };
+            allEntries.push(entry);
+          }
+        }
+      }
+    } else if (source.deepLink) {
+      // === Legacy deep-link pipeline (existing) ===
 
       // 1. Fetch listing page
       reportFetching(source);
@@ -74,12 +140,16 @@ export async function scrapeAll(sources: Source[]): Promise<{entries: GameEntry[
           const entry = parser.extractDownloadEntry(result.html, result.gameLink, source);
           if (entry) {
             entry.index = index++;
+            // Wrap downloadUrl into downloadLinks for backward compatibility
+            if (!entry.downloadLinks || entry.downloadLinks.length === 0) {
+              entry.downloadLinks = [{ url: entry.downloadUrl, hostName: 'Direct Download' }];
+            }
             allEntries.push(entry);
           }
         }
       }
     } else {
-      // === Existing single-pass pipeline (unchanged) ===
+      // === Single-pass pipeline (existing) ===
 
       // 1. Report fetching progress
       reportFetching(source);
@@ -107,6 +177,10 @@ export async function scrapeAll(sources: Source[]): Promise<{entries: GameEntry[
       // 7. Add entries with sequential index
       for (const entry of parseResult.entries) {
         entry.index = index++;
+        // Wrap downloadUrl into downloadLinks for backward compatibility
+        if (!entry.downloadLinks || entry.downloadLinks.length === 0) {
+          entry.downloadLinks = [{ url: entry.downloadUrl, hostName: 'Direct Download' }];
+        }
         allEntries.push(entry);
       }
     }

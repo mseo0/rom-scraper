@@ -58,7 +58,9 @@ describe('Partial Source Failure Integration', () => {
     });
 
     it('should collect entries from successful sources and record errors from failed ones', async () => {
-      const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+      // Use only the single-pass sources
+      const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+      const { entries, errors } = await scrapeAll(singlePassSources);
 
       // 2 errors: one HTTP 500, one timeout
       expect(errors).toHaveLength(2);
@@ -80,7 +82,9 @@ describe('Partial Source Failure Integration', () => {
     });
 
     it('should produce formatted output with successful entries and error messages', async () => {
-      const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+      // Use only the single-pass sources
+      const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+      const { entries, errors } = await scrapeAll(singlePassSources);
       const output = formatResults(entries, errors);
 
       // Summary counts only successful entries
@@ -107,10 +111,12 @@ describe('Partial Source Failure Integration', () => {
         return { source: s, html: null, error: `HTTP error 500 fetching ${s.url}` };
       });
 
-      const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+      // Use only the single-pass sources
+      const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+      const { entries, errors } = await scrapeAll(singlePassSources);
 
       expect(entries).toHaveLength(0);
-      expect(errors).toHaveLength(4);
+      expect(errors).toHaveLength(singlePassSources.length);
 
       const output = formatResults(entries, errors);
       expect(output).toContain('No .nsp files were found on any source.');
@@ -123,9 +129,12 @@ describe('Partial Source Failure Integration', () => {
 
   describe('only 1 source succeeds', () => {
     it('should collect entries from the single successful source', async () => {
+      // Use only the single-pass sources
+      const singlePassSources = TARGET_SOURCES.filter((s) => s.name in sourceHtml);
+
       // Only Romenix succeeds
       const failAll = new Set(
-        TARGET_SOURCES.filter((s) => s.name !== 'Romenix').map((s) => s.name),
+        singlePassSources.filter((s) => s.name !== 'Romenix').map((s) => s.name),
       );
       mockedFetch.mockImplementation(async (s: Source): Promise<FetchResult> => {
         if (failAll.has(s.name)) {
@@ -134,10 +143,10 @@ describe('Partial Source Failure Integration', () => {
         return { source: s, html: sourceHtml[s.name], error: null };
       });
 
-      const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+      const { entries, errors } = await scrapeAll(singlePassSources);
 
-      // 3 sources failed
-      expect(errors).toHaveLength(3);
+      // All sources except Romenix failed
+      expect(errors).toHaveLength(singlePassSources.length - 1);
 
       // Only Romenix entry
       expect(entries).toHaveLength(1);

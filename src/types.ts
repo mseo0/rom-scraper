@@ -1,3 +1,5 @@
+import { DownloadLink } from './fileHosts';
+
 export interface Source {
   url: string;
   name: string;
@@ -8,10 +10,31 @@ export interface Source {
 export interface GameEntry {
   index: number;
   gameName: string;
-  downloadUrl: string;
+  downloadLinks?: DownloadLink[];  // All file host links for this game
+  downloadUrl: string;             // First download link URL (backward compat)
   sourceName: string;
   sourceUrl: string;
   detailPageUrl?: string;
+}
+
+export interface SourceParser {
+  /**
+   * Extract game links from a catalog/listing page.
+   * Returns GameLink[] with absolute URLs to detail pages.
+   */
+  extractGameLinks(html: string, baseUrl: string): GameLink[];
+
+  /**
+   * Extract candidate download URLs from a detail page.
+   * Returns raw URLs found on the page — the orchestrator
+   * runs these through the file host registry and intermediary filter.
+   *
+   * Also extracts the game name from the page content.
+   */
+  extractDownloadLinks(html: string, detailPageUrl: string): {
+    gameName: string;
+    urls: string[];
+  };
 }
 
 export interface FetchResult {

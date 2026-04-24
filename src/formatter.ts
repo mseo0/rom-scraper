@@ -1,11 +1,26 @@
 import Table from 'cli-table3';
 import { GameEntry } from './types';
+import { DownloadLink } from './fileHosts';
 
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) {
     return text;
   }
   return text.slice(0, maxLength) + "...";
+}
+
+/**
+ * Format the download URL column for a GameEntry.
+ * When downloadLinks is non-empty, show each link as "[HostName] url" on its own line.
+ * Otherwise fall back to the single downloadUrl.
+ */
+function formatDownloadColumn(entry: GameEntry): string {
+  if (entry.downloadLinks && entry.downloadLinks.length > 0) {
+    return entry.downloadLinks
+      .map((link: DownloadLink) => `[${link.hostName}] ${truncate(link.url, 80)}`)
+      .join('\n');
+  }
+  return truncate(entry.downloadUrl, 80);
 }
 
 export function buildSummary(entries: GameEntry[]): string {
@@ -39,7 +54,7 @@ export function formatSearchResults(entries: GameEntry[], query: string, errors:
       entry.index,
       truncate(entry.gameName, 50),
       entry.sourceName,
-      truncate(entry.downloadUrl, 80),
+      formatDownloadColumn(entry),
     ]);
   }
 
@@ -70,7 +85,7 @@ export function formatResults(entries: GameEntry[], errors: string[]): string {
       entry.index,
       truncate(entry.gameName, 50),
       entry.sourceName,
-      truncate(entry.downloadUrl, 80),
+      formatDownloadColumn(entry),
     ]);
   }
 
