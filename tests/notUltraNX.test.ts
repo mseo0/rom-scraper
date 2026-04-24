@@ -2,79 +2,95 @@ import { describe, it, expect } from 'vitest';
 import { notUltraNXParser } from '../src/parsers/notUltraNX';
 
 const catalogBaseUrl = 'https://not.ultranx.ru/en';
-const detailPageUrl = 'https://not.ultranx.ru/en/game/123';
+const detailPageUrl = 'https://not.ultranx.ru/en/game/0100974026B32000';
 
 describe('notUltraNX: extractGameLinks', () => {
-  it('extracts game links from catalog HTML with article elements', () => {
+  it('extracts game links from catalog HTML with div.card[data-href] elements', () => {
     const html = `
       <html><body>
-        <article>
-          <a href="/en/game/zelda">The Legend of Zelda: TOTK</a>
-        </article>
-        <article>
-          <a href="/en/game/mario">Super Mario Odyssey</a>
-        </article>
-        <article>
-          <a href="/en/game/metroid">Metroid Dread</a>
-        </article>
+        <div class="card-container">
+          <div class="card cursor-pointer" data-href="en/game/0100F2C0115B6000">
+            <div class="card-content">
+              <div class="card-title">The Legend of Zelda: TOTK</div>
+            </div>
+          </div>
+          <div class="card cursor-pointer" data-href="en/game/0100000000010000">
+            <div class="card-content">
+              <div class="card-title">Super Mario Odyssey</div>
+            </div>
+          </div>
+          <div class="card cursor-pointer" data-href="en/game/010093801237C000">
+            <div class="card-content">
+              <div class="card-title">Metroid Dread</div>
+            </div>
+          </div>
+        </div>
       </body></html>
     `;
     const links = notUltraNXParser.extractGameLinks(html, catalogBaseUrl);
     expect(links).toHaveLength(3);
     expect(links[0]).toEqual({
-      url: 'https://not.ultranx.ru/en/game/zelda',
+      url: 'https://not.ultranx.ru/en/game/0100F2C0115B6000',
       title: 'The Legend of Zelda: TOTK',
     });
     expect(links[1]).toEqual({
-      url: 'https://not.ultranx.ru/en/game/mario',
+      url: 'https://not.ultranx.ru/en/game/0100000000010000',
       title: 'Super Mario Odyssey',
     });
     expect(links[2]).toEqual({
-      url: 'https://not.ultranx.ru/en/game/metroid',
+      url: 'https://not.ultranx.ru/en/game/010093801237C000',
       title: 'Metroid Dread',
     });
   });
 
-  it('resolves relative URLs to absolute URLs', () => {
+  it('resolves relative data-href to absolute URLs', () => {
     const html = `
       <html><body>
-        <article>
-          <a href="/en/game/zelda">Zelda</a>
-        </article>
-        <article>
-          <a href="game/mario">Mario</a>
-        </article>
+        <div class="card" data-href="en/game/0100F2C0115B6000">
+          <div class="card-title">Zelda</div>
+        </div>
       </body></html>
     `;
     const links = notUltraNXParser.extractGameLinks(html, catalogBaseUrl);
-    expect(links.length).toBeGreaterThanOrEqual(1);
-    for (const link of links) {
-      expect(link.url).toMatch(/^https?:\/\//);
-    }
-    expect(links[0].url).toBe('https://not.ultranx.ru/en/game/zelda');
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe('https://not.ultranx.ru/en/game/0100F2C0115B6000');
+    expect(links[0].url).toMatch(/^https?:\/\//);
   });
 
   it('returns empty array for empty HTML', () => {
     expect(notUltraNXParser.extractGameLinks('', catalogBaseUrl)).toEqual([]);
   });
 
-  it('returns empty array for HTML with no matching links', () => {
+  it('returns empty array for HTML with no matching elements', () => {
     const html = `
       <html><body>
-        <p>No links here at all</p>
+        <p>No cards here at all</p>
         <div>Just some text content</div>
       </body></html>
     `;
     expect(notUltraNXParser.extractGameLinks(html, catalogBaseUrl)).toEqual([]);
   });
 
-  it('filters out external domain links', () => {
+  it('deduplicates cards with the same data-href', () => {
     const html = `
       <html><body>
-        <article>
-          <a href="https://not.ultranx.ru/en/game/zelda">Zelda</a>
-          <a href="https://other-site.com/game">External Game</a>
-        </article>
+        <div class="card" data-href="en/game/0100F2C0115B6000">
+          <div class="card-title">Zelda</div>
+        </div>
+        <div class="card" data-href="en/game/0100F2C0115B6000">
+          <div class="card-title">Zelda Again</div>
+        </div>
+      </body></html>
+    `;
+    const links = notUltraNXParser.extractGameLinks(html, catalogBaseUrl);
+    expect(links).toHaveLength(1);
+  });
+
+  it('falls back to <a> tags with /game/ in href when no cards found', () => {
+    const html = `
+      <html><body>
+        <a href="/en/game/zelda">Zelda</a>
+        <a href="/en/other-page">Other</a>
       </body></html>
     `;
     const links = notUltraNXParser.extractGameLinks(html, catalogBaseUrl);
@@ -82,72 +98,56 @@ describe('notUltraNX: extractGameLinks', () => {
     expect(links[0].url).toBe('https://not.ultranx.ru/en/game/zelda');
   });
 
-  it('deduplicates links with the same URL', () => {
+  it('skips cards with empty data-href', () => {
     const html = `
       <html><body>
-        <article>
-          <a href="/en/game/zelda">Zelda</a>
-        </article>
-        <article>
-          <a href="/en/game/zelda">Zelda Again</a>
-        </article>
+        <div class="card" data-href="">
+          <div class="card-title">Empty</div>
+        </div>
+        <div class="card" data-href="en/game/abc">
+          <div class="card-title">Valid</div>
+        </div>
       </body></html>
     `;
     const links = notUltraNXParser.extractGameLinks(html, catalogBaseUrl);
     expect(links).toHaveLength(1);
-    expect(links[0].url).toBe('https://not.ultranx.ru/en/game/zelda');
-  });
-
-  it('skips anchor-only and javascript: links', () => {
-    const html = `
-      <html><body>
-        <article>
-          <a href="#">Top</a>
-          <a href="javascript:void(0)">Click</a>
-          <a href="/en/game/zelda">Zelda</a>
-        </article>
-      </body></html>
-    `;
-    const links = notUltraNXParser.extractGameLinks(html, catalogBaseUrl);
-    expect(links).toHaveLength(1);
-    expect(links[0].url).toBe('https://not.ultranx.ru/en/game/zelda');
-  });
-
-  it('returns empty array for invalid base URL', () => {
-    const html = `<article><a href="/game/zelda">Zelda</a></article>`;
-    expect(notUltraNXParser.extractGameLinks(html, 'not-a-url')).toEqual([]);
+    expect(links[0].title).toBe('Valid');
   });
 });
 
 describe('notUltraNX: extractDownloadLinks', () => {
-  it('extracts game name from h1 and external download URLs', () => {
+  it('extracts game name from h1 and download URLs from .download-buttons', () => {
     const html = `
       <html><body>
         <h1>The Legend of Zelda: Tears of the Kingdom</h1>
-        <div class="downloads">
-          <a href="https://mega.nz/file/abc123">Download from Mega</a>
-          <a href="https://1fichier.com/?xyz789">Download from 1fichier</a>
+        <div class="download-buttons">
+          <a href="https://api.ultranx.ru/games/download/0100F2C0115B6000/base">Download Base</a>
+          <a href="https://api.ultranx.ru/games/download/0100F2C0115B6000/update">Download Update</a>
+          <a href="https://api.ultranx.ru/games/download/0100F2C0115B6000/full">Download everything</a>
         </div>
       </body></html>
     `;
     const result = notUltraNXParser.extractDownloadLinks(html, detailPageUrl);
     expect(result.gameName).toBe('The Legend of Zelda: Tears of the Kingdom');
-    expect(result.urls).toContain('https://mega.nz/file/abc123');
-    expect(result.urls).toContain('https://1fichier.com/?xyz789');
+    expect(result.urls).toHaveLength(3);
+    expect(result.urls).toContain('https://api.ultranx.ru/games/download/0100F2C0115B6000/base');
+    expect(result.urls).toContain('https://api.ultranx.ru/games/download/0100F2C0115B6000/update');
+    expect(result.urls).toContain('https://api.ultranx.ru/games/download/0100F2C0115B6000/full');
   });
 
   it('falls back to title tag when no h1 is present', () => {
     const html = `
       <html>
-        <head><title>Super Mario Odyssey - Download</title></head>
+        <head><title>notUltraNX - Super Mario Odyssey</title></head>
         <body>
-          <a href="https://mediafire.com/file/abc">Download</a>
+          <div class="download-buttons">
+            <a href="https://api.ultranx.ru/games/download/abc/base">Download</a>
+          </div>
         </body>
       </html>
     `;
     const result = notUltraNXParser.extractDownloadLinks(html, detailPageUrl);
-    expect(result.gameName).toBe('Super Mario Odyssey - Download');
-    expect(result.urls).toContain('https://mediafire.com/file/abc');
+    expect(result.gameName).toBe('Super Mario Odyssey');
   });
 
   it('returns empty gameName and empty urls for empty HTML', () => {
@@ -156,33 +156,7 @@ describe('notUltraNX: extractDownloadLinks', () => {
     expect(result.urls).toEqual([]);
   });
 
-  it('returns empty urls when page has no external links', () => {
-    const html = `
-      <html><body>
-        <h1>Metroid Dread</h1>
-        <a href="/en/other-page">Internal Link</a>
-        <a href="https://not.ultranx.ru/en/another">Another Internal</a>
-      </body></html>
-    `;
-    const result = notUltraNXParser.extractDownloadLinks(html, detailPageUrl);
-    expect(result.gameName).toBe('Metroid Dread');
-    expect(result.urls).toEqual([]);
-  });
-
-  it('deduplicates external URLs', () => {
-    const html = `
-      <html><body>
-        <h1>Zelda</h1>
-        <a href="https://mega.nz/file/abc">Link 1</a>
-        <a href="https://mega.nz/file/abc">Link 2</a>
-      </body></html>
-    `;
-    const result = notUltraNXParser.extractDownloadLinks(html, detailPageUrl);
-    expect(result.urls).toHaveLength(1);
-    expect(result.urls[0]).toBe('https://mega.nz/file/abc');
-  });
-
-  it('excludes same-domain links and includes only external links', () => {
+  it('falls back to external links when no .download-buttons found', () => {
     const html = `
       <html><body>
         <h1>Game Title</h1>
@@ -195,5 +169,19 @@ describe('notUltraNX: extractDownloadLinks', () => {
     expect(result.urls).toHaveLength(2);
     expect(result.urls).toContain('https://mega.nz/file/abc');
     expect(result.urls).toContain('https://drive.google.com/file/d/xyz');
+  });
+
+  it('deduplicates download URLs', () => {
+    const html = `
+      <html><body>
+        <h1>Zelda</h1>
+        <div class="download-buttons">
+          <a href="https://api.ultranx.ru/games/download/abc/base">Link 1</a>
+          <a href="https://api.ultranx.ru/games/download/abc/base">Link 2</a>
+        </div>
+      </body></html>
+    `;
+    const result = notUltraNXParser.extractDownloadLinks(html, detailPageUrl);
+    expect(result.urls).toHaveLength(1);
   });
 });

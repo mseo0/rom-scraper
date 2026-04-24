@@ -13,6 +13,7 @@ const FILE_HOST_DOMAINS: Map<string, string> = new Map([
   ['pixeldrain.com', 'Pixeldrain'],
   ['krakenfiles.com', 'KrakenFiles'],
   ['buzzheavier.com', 'Buzzheavier'],
+  ['api.ultranx.ru', 'notUltraNX'],
 ]);
 
 /** Known intermediary / ad gate domains */

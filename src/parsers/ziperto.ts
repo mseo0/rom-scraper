@@ -10,6 +10,10 @@ import { SourceParser, GameLink } from '../types';
  * catalog and the .entry-content download section on detail pages.
  */
 export const zipertoParser: SourceParser = {
+  getSearchUrl(query: string, baseUrl: string): string {
+    const origin = new URL(baseUrl).origin;
+    return `${origin}/?s=${encodeURIComponent(query)}`;
+  },
   /**
    * Extract game links from the paginated catalog page.
    * Targets article/post title links (WordPress entry-title pattern),

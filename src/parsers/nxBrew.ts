@@ -10,6 +10,10 @@ import { SourceParser, GameLink } from '../types';
  * navigation links.
  */
 export const nxBrewParser: SourceParser = {
+  getSearchUrl(query: string, baseUrl: string): string {
+    const origin = new URL(baseUrl).origin;
+    return `${origin}/?s=${encodeURIComponent(query)}`;
+  },
   /**
    * Extract game links from the paginated blog-style catalog page.
    * Targets post/article title links and avoids sidebar widgets,

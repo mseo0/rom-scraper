@@ -35,6 +35,12 @@ export interface SourceParser {
     gameName: string;
     urls: string[];
   };
+
+  /**
+   * Build a search URL for this source given a query string.
+   * If not implemented, the orchestrator uses the default catalog URL.
+   */
+  getSearchUrl?(query: string, baseUrl: string): string;
 }
 
 export interface FetchResult {

@@ -9,6 +9,9 @@ import { SourceParser, GameLink } from '../types';
  * by checking link text, section context, and URL paths.
  */
 export const switchGamesMallParser: SourceParser = {
+  getSearchUrl(query: string, _baseUrl: string): string {
+    return `https://smallgames.ch/search?q=${encodeURIComponent(query)}`;
+  },
   /**
    * Extract game links from the catalog grid page.
    * Selects game card/entry links, filters to Switch games section

@@ -11,7 +11,7 @@ import {
   reportExtractingDownloads,
 } from './progress';
 
-export async function scrapeAll(sources: Source[]): Promise<{entries: GameEntry[], errors: string[]}> {
+export async function scrapeAll(sources: Source[], searchQuery?: string | null): Promise<{entries: GameEntry[], errors: string[]}> {
   const allEntries: GameEntry[] = [];
   const allErrors: string[] = [];
   let index = 1;
@@ -20,11 +20,18 @@ export async function scrapeAll(sources: Source[]): Promise<{entries: GameEntry[
     const sourceParser = getSourceParser(source.name);
 
     if (sourceParser) {
-      // === Multi-layer pipeline (new) ===
+      // === Multi-layer pipeline ===
 
-      // 1. Fetch catalog page
-      reportFetching(source);
-      const fetchResult = await fetchSource(source);
+      // 1. Determine the URL to fetch: search URL if query provided, otherwise catalog URL
+      let fetchUrl = source.url;
+      if (searchQuery && sourceParser.getSearchUrl) {
+        fetchUrl = sourceParser.getSearchUrl(searchQuery, source.url);
+      }
+      const fetchSource_ = { ...source, url: fetchUrl };
+
+      // 2. Fetch catalog/search page
+      reportFetching(fetchSource_);
+      const fetchResult = await fetchSource(fetchSource_);
       if (fetchResult.error) {
         allErrors.push(fetchResult.error);
         continue;
@@ -32,7 +39,7 @@ export async function scrapeAll(sources: Source[]): Promise<{entries: GameEntry[
 
       // 2. Extract game links via SourceParser
       reportExtractingLinks(source);
-      const gameLinks = sourceParser.extractGameLinks(fetchResult.html!, source.url);
+      const gameLinks = sourceParser.extractGameLinks(fetchResult.html!, fetchUrl);
 
       // 3. Deduplicate game links by URL
       const seen = new Set<string>();

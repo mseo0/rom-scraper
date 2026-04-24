@@ -25,7 +25,7 @@ export function parseArgs(argv: string[]): CliArgs {
 
 async function main(): Promise<void> {
   const { searchQuery } = parseArgs(process.argv);
-  const { entries, errors } = await scrapeAll(TARGET_SOURCES);
+  const { entries, errors } = await scrapeAll(TARGET_SOURCES, searchQuery);
 
   if (searchQuery === null) {
     // Normal mode

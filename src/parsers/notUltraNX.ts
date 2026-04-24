@@ -8,6 +8,9 @@ import { SourceParser, GameLink } from '../types';
  * Catalog shows game titles, release dates, and file sizes in a grid layout.
  */
 export const notUltraNXParser: SourceParser = {
+  getSearchUrl(query: string, baseUrl: string): string {
+    return `${baseUrl}?s=${encodeURIComponent(query)}`;
+  },
   /**
    * Extract game links from the catalog/listing page.
    * Selects game card/entry links from the catalog grid,
@@ -18,45 +21,16 @@ export const notUltraNXParser: SourceParser = {
     const seen = new Set<string>();
     const links: GameLink[] = [];
 
-    let baseDomain: string;
-    try {
-      baseDomain = new URL(baseUrl).hostname;
-    } catch {
-      return [];
-    }
+    // notUltraNX uses <div class="card" data-href="en/game/..."> for game entries
+    // with <div class="card-title"> for the game name. No <a> tags for game links.
+    $('div.card[data-href]').each((_, el) => {
+      const dataHref = $(el).attr('data-href');
+      if (!dataHref) return;
 
-    // Look for game entry links within common catalog structures:
-    // article elements, card containers, grid items, or list entries
-    const selectors = [
-      'article a[href]',
-      '.game-card a[href]',
-      '.game-item a[href]',
-      '.card a[href]',
-      '.catalog a[href]',
-      '.games-list a[href]',
-      '.grid a[href]',
-      '.entry a[href]',
-      '.post a[href]',
-      '.item a[href]',
-    ];
+      const trimmedHref = dataHref.trim();
+      if (!trimmedHref) return;
 
-    const selectorString = selectors.join(', ');
-    let matched = $(selectorString);
-
-    // Fallback: if no structured elements found, scan all anchors
-    // but filter to same-domain links that look like detail pages
-    if (matched.length === 0) {
-      matched = $('a[href]');
-    }
-
-    matched.each((_, el) => {
-      const href = $(el).attr('href');
-      if (!href) return;
-
-      const trimmedHref = href.trim();
-      if (!trimmedHref || trimmedHref === '#' || trimmedHref.startsWith('javascript:')) return;
-
-      // Resolve relative URLs to absolute
+      // Resolve relative data-href to absolute URL
       let absoluteUrl: string;
       try {
         absoluteUrl = new URL(trimmedHref, baseUrl).href;
@@ -64,30 +38,45 @@ export const notUltraNXParser: SourceParser = {
         return;
       }
 
-      // Filter to same-domain links only (detail pages are on the same site)
-      let linkDomain: string;
-      try {
-        linkDomain = new URL(absoluteUrl).hostname;
-      } catch {
-        return;
-      }
-
-      if (linkDomain !== baseDomain) return;
-
-      // Skip catalog/navigation/utility links
-      const lower = absoluteUrl.toLowerCase();
-      if (lower.endsWith('.css') || lower.endsWith('.js') || lower.endsWith('.png') ||
-          lower.endsWith('.jpg') || lower.endsWith('.svg') || lower.endsWith('.ico')) return;
-
       // Deduplicate by URL
       if (seen.has(absoluteUrl)) return;
       seen.add(absoluteUrl);
 
-      const title = $(el).text().trim() || '';
+      const title = $(el).find('.card-title').first().text().trim() || '';
       if (title) {
         links.push({ url: absoluteUrl, title });
       }
     });
+
+    // Fallback: also check <a> tags inside structured elements
+    // in case the site changes its markup
+    if (links.length === 0) {
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (!href) return;
+
+        const trimmedHref = href.trim();
+        if (!trimmedHref || trimmedHref === '#' || trimmedHref.startsWith('javascript:') || trimmedHref.startsWith('?')) return;
+
+        let absoluteUrl: string;
+        try {
+          absoluteUrl = new URL(trimmedHref, baseUrl).href;
+        } catch {
+          return;
+        }
+
+        // Only game detail pages (contain /game/ in path)
+        if (!absoluteUrl.includes('/game/')) return;
+
+        if (seen.has(absoluteUrl)) return;
+        seen.add(absoluteUrl);
+
+        const title = $(el).text().trim() || '';
+        if (title) {
+          links.push({ url: absoluteUrl, title });
+        }
+      });
+    }
 
     return links;
   },
@@ -114,30 +103,24 @@ export const notUltraNXParser: SourceParser = {
     if (!gameName) {
       const titleText = $('title').text().trim();
       if (titleText) {
-        gameName = titleText;
+        // Strip site prefix like "notUltraNX - "
+        gameName = titleText.replace(/^notUltraNX\s*-\s*/i, '').trim();
       }
     }
 
-    // Collect all external anchor hrefs as candidate download URLs.
-    // The orchestrator will filter these through the file host registry.
+    // notUltraNX has download links in <div class="download-buttons">
+    // pointing to api.ultranx.ru/games/download/...
     const urls: string[] = [];
     const seenUrls = new Set<string>();
 
-    let detailDomain: string;
-    try {
-      detailDomain = new URL(detailPageUrl).hostname;
-    } catch {
-      detailDomain = '';
-    }
-
-    $('a[href]').each((_, el) => {
+    // First: look for download buttons (the primary download mechanism)
+    $('.download-buttons a[href], .download-section a[href]').each((_, el) => {
       const href = $(el).attr('href');
       if (!href) return;
 
       const trimmedHref = href.trim();
       if (!trimmedHref || trimmedHref === '#' || trimmedHref.startsWith('javascript:')) return;
 
-      // Resolve relative URLs
       let absoluteUrl: string;
       try {
         absoluteUrl = new URL(trimmedHref, detailPageUrl).href;
@@ -145,22 +128,50 @@ export const notUltraNXParser: SourceParser = {
         return;
       }
 
-      // Only collect external links (different domain) as download candidates
-      let linkDomain: string;
-      try {
-        linkDomain = new URL(absoluteUrl).hostname;
-      } catch {
-        return;
-      }
-
-      if (detailDomain && linkDomain === detailDomain) return;
-
-      // Deduplicate
       if (seenUrls.has(absoluteUrl)) return;
       seenUrls.add(absoluteUrl);
 
       urls.push(absoluteUrl);
     });
+
+    // Fallback: collect all external links if no download buttons found
+    if (urls.length === 0) {
+      let detailDomain: string;
+      try {
+        detailDomain = new URL(detailPageUrl).hostname;
+      } catch {
+        detailDomain = '';
+      }
+
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (!href) return;
+
+        const trimmedHref = href.trim();
+        if (!trimmedHref || trimmedHref === '#' || trimmedHref.startsWith('javascript:')) return;
+
+        let absoluteUrl: string;
+        try {
+          absoluteUrl = new URL(trimmedHref, detailPageUrl).href;
+        } catch {
+          return;
+        }
+
+        let linkDomain: string;
+        try {
+          linkDomain = new URL(absoluteUrl).hostname;
+        } catch {
+          return;
+        }
+
+        if (detailDomain && linkDomain === detailDomain) return;
+
+        if (seenUrls.has(absoluteUrl)) return;
+        seenUrls.add(absoluteUrl);
+
+        urls.push(absoluteUrl);
+      });
+    }
 
     return { gameName, urls };
   },
