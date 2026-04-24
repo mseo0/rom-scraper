@@ -2,6 +2,8 @@ import { Source, GameEntry, GameLink } from './types';
 import { DownloadLink, filterDownloadLinks } from './fileHosts';
 import { fetchSource, fetchDetailPages } from './fetcher';
 import { parseSource, getDeepLinkParser, getSourceParser } from './parser';
+import { getUltraNXToken } from './auth';
+import axios from 'axios';
 import {
   reportFetching,
   reportParsing,
@@ -70,10 +72,27 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
 
       // 7. Extract download links from successful detail pages
       reportExtractingDownloads(source);
+
+      // For notUltraNX, get auth token before resolving download URLs
+      let ultranxToken: string | null = null;
+      if (source.name === 'notUltraNX') {
+        ultranxToken = await getUltraNXToken();
+        if (!ultranxToken) {
+          process.stdout.write(`  \x1b[33mnotUltraNX → skipped (login required)\x1b[0m\n`);
+          continue;
+        }
+      }
+
       for (const result of detailResults) {
         if (result.html) {
           const extracted = sourceParser.extractDownloadLinks(result.html, result.gameLink.url);
-          const downloadLinks = filterDownloadLinks(extracted.urls);
+          let downloadLinks = filterDownloadLinks(extracted.urls);
+
+          // Resolve notUltraNX download URLs to actual file URLs
+          if (ultranxToken && downloadLinks.length > 0) {
+            const resolved = await resolveUltraNXLinks(downloadLinks, ultranxToken);
+            downloadLinks = resolved;
+          }
 
           if (downloadLinks.length > 0) {
             const entry: GameEntry = {
@@ -197,4 +216,48 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
   reportComplete();
 
   return { entries: allEntries, errors: allErrors };
+}
+
+
+/**
+ * Resolve notUltraNX API download URLs to actual file download URLs.
+ * The API returns a redirect (302) to the real file URL when given a valid token.
+ * If resolution fails, keeps the original URL with the token appended.
+ */
+async function resolveUltraNXLinks(links: DownloadLink[], token: string): Promise<DownloadLink[]> {
+  const resolved: DownloadLink[] = [];
+
+  for (const link of links) {
+    if (!link.url.includes('api.ultranx.ru')) {
+      resolved.push(link);
+      continue;
+    }
+
+    try {
+      const response = await axios.get(link.url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        timeout: 15000,
+        maxRedirects: 0,
+        validateStatus: (s) => s >= 200 && s < 400,
+      });
+
+      // If we get a redirect, use the Location header
+      if (response.status >= 300 && response.headers.location) {
+        resolved.push({ url: response.headers.location, hostName: link.hostName });
+      } else {
+        // API returned the file directly — keep original URL with auth note
+        resolved.push(link);
+      }
+    } catch (err: any) {
+      // Axios throws on 3xx when maxRedirects=0, check the redirect
+      if (err?.response?.status >= 300 && err?.response?.headers?.location) {
+        resolved.push({ url: err.response.headers.location, hostName: link.hostName });
+      } else {
+        // Resolution failed — keep original URL
+        resolved.push(link);
+      }
+    }
+  }
+
+  return resolved;
 }
