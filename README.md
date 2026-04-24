@@ -84,10 +84,11 @@ rom-scraper fire emblem
 rom-scraper "mario kart"
 ```
 
-Or use the `--search` flag:
+Or use the `--search` (or `-s`) flag:
 
 ```bash
 rom-scraper --search zelda
+rom-scraper -s zelda
 ```
 
 ### Interactive Mode
@@ -174,7 +175,7 @@ Download labels:
 | Flag | Description |
 |------|-------------|
 | `<query>` | Search for a game by name |
-| `--search <query>` | Search for a game (explicit flag) |
+| `--search <query>`, `-s <query>` | Search for a game (explicit flag) |
 | `--new` | Show recently added games |
 | `--ping` | Check if sources are reachable |
 
@@ -185,6 +186,7 @@ Flags are mutually exclusive. You can't combine `--new`, `--ping`, or a search q
 | Source | URL | Notes |
 |--------|-----|-------|
 | notUltraNX | `https://not.ultranx.ru/en` | Clean HTML, direct API downloads, free account required |
+| NXBrew | `https://nxbrew.net/` | 🚧 Work in progress — large catalog, static HTML |
 
 ## Dependencies
 

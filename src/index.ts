@@ -26,8 +26,9 @@ export function parseArgs(argv: string[]): CliArgs {
   const hasNew = args.includes('--new');
   const hasPing = args.includes('--ping');
 
-  // Check for --search flag
-  const searchIndex = args.indexOf('--search');
+  // Check for --search or -s flag
+  let searchIndex = args.indexOf('--search');
+  if (searchIndex === -1) searchIndex = args.indexOf('-s');
   let searchQuery: string | null = null;
   if (searchIndex !== -1) {
     const nextArg = args[searchIndex + 1];
@@ -37,8 +38,8 @@ export function parseArgs(argv: string[]): CliArgs {
     }
     searchQuery = nextArg;
   } else {
-    // Bare arguments (excluding --new and --ping) become the search query
-    const bareArgs = args.filter(a => a !== '--new' && a !== '--ping');
+    // Bare arguments (excluding --new, --ping, -s) become the search query
+    const bareArgs = args.filter(a => a !== '--new' && a !== '--ping' && a !== '-s');
     if (bareArgs.length > 0) {
       const query = bareArgs.join(' ').trim();
       if (query) searchQuery = query;
