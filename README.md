@@ -1,5 +1,13 @@
 # rom-scraper
 
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)
+![npm](https://img.shields.io/badge/npm-CB3837?logo=npm&logoColor=white)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
+![CLI](https://img.shields.io/badge/Interface-CLI-black?logo=windowsterminal&logoColor=white)
+![Nintendo Switch](https://img.shields.io/badge/Nintendo%20Switch-E60012?logo=nintendoswitch&logoColor=white)
+
 A CLI to search and grab Nintendo Switch ROMs from the terminal. This tool scrapes [notUltraNX](https://not.ultranx.ru/en).
 
 ## Table of Contents
