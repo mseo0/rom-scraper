@@ -1,21 +1,20 @@
 # rom-scraper
 
-A CLI tool that scrapes Nintendo Switch ROM sources and displays download links with file host names. Uses a multi-layer scraping pipeline: catalog page → detail page → file host link extraction.
+A CLI tool for searching and downloading Nintendo Switch ROMs directly from [notUltraNX](https://not.ultranx.ru/en). Search by game name, get clickable download links in your terminal.
 
-## Sources
+## Why notUltraNX
 
-| Source | URL | JS Required |
-|--------|-----|-------------|
-| notUltraNX | not.ultranx.ru | No |
-| NXBrew | nxbrew.net | No |
-| SwitchGamesMall | smallgames.ch | No |
-| Ziperto | ziperto.com | Yes (Cloudflare) |
+Most ROM sites are riddled with fake download buttons, ad gates, link shorteners, and malware-laced redirects. You click "Download" and end up on five different ad pages before landing on a sketchy `.exe` instead of your game.
 
-### Recognized file hosts
+notUltraNX is different:
 
-Mega, Google Drive, MediaFire, 1fichier, MegaUp, SendCM, DooDrive, Uptobox, Gofile, Pixeldrain, KrakenFiles, Buzzheavier, notUltraNX API
+- **Direct downloads** — files are served from their own API (`api.ultranx.ru`), not through third-party file hosts or ad-gated link shorteners
+- **No intermediaries** — no bit.ly, adf.ly, ouo.io, linkvertise, or any other ad gate sitting between you and the file
+- **No fake download buttons** — the site has a clean UI with real download links, no deceptive ads disguised as buttons
+- **No malware risk from file hosts** — since files come from notUltraNX's own servers, you're not downloading from random file hosting services that bundle adware or worse
+- **Account-gated** — requires a free account, which means the downloads are authenticated and tracked, reducing abuse and keeping the service clean
 
-Link shorteners and ad gates (bit.ly, adf.ly, ouo.io, linkvertise.com, etc.) are automatically filtered out.
+This tool automates the search and gives you direct download links without ever opening a browser or navigating through any site.
 
 ## Setup
 
@@ -33,42 +32,59 @@ npm run build
 npm install -g .
 ```
 
+## Account setup
+
+notUltraNX requires a free account. Register at [not.ultranx.ru/en/register](https://not.ultranx.ru/en/register), then run `rom-scraper`. It will prompt for your credentials on first use and save them to `~/.rom-scraper.json` (chmod 600).
+
 ## Usage
 
-Scrape all sources and display every result:
+### Interactive mode
+
+Just run it — you get a search prompt that loops:
 
 ```bash
 rom-scraper
 ```
 
-Search for a specific game across all sources:
+```
+  🎮  rom-scraper
+  Nintendo Switch ROM search tool
 
-```bash
-rom-scraper --search "zelda"
+  Search Game: zelda
+
+  Searching for "zelda"...
 ```
 
-When `--search` is used, each source's native search is queried directly instead of scraping the front page. This means you can find any game the site has, not just what's on the first page.
+Type `exit`, `quit`, `q`, or press Enter with nothing to exit.
 
-### Search examples
+### Direct search
 
 ```bash
-rom-scraper --search "mario"
+rom-scraper zelda
+rom-scraper fire emblem
+rom-scraper "mario kart"
+```
+
+The `--search` flag also works:
+
+```bash
 rom-scraper --search "metroid"
-rom-scraper --search "fire emblem"
 ```
 
 ### Output
 
-```
-Found 1 result(s) for 'metroid':
+Download links are clickable in supported terminals (iTerm2, Terminal.app, VS Code terminal). Cmd+click to open in your browser.
 
-┌───┬──────────────────────────┬────────────┬──────────────────────────────────────────────────────┐
-│ # │ Game Name                │ Source     │ Download URL                                         │
-├───┼──────────────────────────┼────────────┼──────────────────────────────────────────────────────┤
-│ 1 │ Metroid Prime™ 4: Beyond │ notUltraNX │ [notUltraNX] https://api.ultranx.ru/games/download/…│
-│   │                          │            │ [notUltraNX] https://api.ultranx.ru/games/download/…│
-│   │                          │            │ [notUltraNX] https://api.ultranx.ru/games/download/…│
-└───┴──────────────────────────┴────────────┴──────────────────────────────────────────────────────┘
+```
+Found 5 result(s) for 'zelda':
+
+┌───┬──────────────────────────────────────────┬────────────┬─────────────────────────────┐
+│ # │ Game Name                                │ Source     │ Downloads                   │
+├───┼──────────────────────────────────────────┼────────────┼─────────────────────────────┤
+│ 1 │ The Legend of Zelda: Echoes of Wisdom    │ notUltraNX │ 📥 Direct Download          │
+├───┼──────────────────────────────────────────┼────────────┼─────────────────────────────┤
+│ 2 │ The Legend of Zelda: Tears of the Kingdom│ notUltraNX │ 📥 Direct Download          │
+└───┴──────────────────────────────────────────┴────────────┴─────────────────────────────┘
 ```
 
 ## Development
@@ -82,4 +98,4 @@ npm run build
 
 - Node.js 18+
 - npm
-- Google Chrome (for JS-rendered sources)
+- A free notUltraNX account

@@ -10,17 +10,28 @@ export function truncate(text: string, maxLength: number): string {
 }
 
 /**
+ * Create a clickable terminal hyperlink using OSC 8 escape sequence.
+ * Supported by iTerm2, Terminal.app (macOS Sonoma+), Hyper, VS Code terminal, etc.
+ * Falls back to just showing the label text in terminals that don't support it.
+ */
+function hyperlink(url: string, label: string): string {
+  return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`;
+}
+
+/**
  * Format the download URL column for a GameEntry.
- * When downloadLinks is non-empty, show each link as "[HostName] url" on its own line.
- * Otherwise fall back to the single downloadUrl.
+ * Shows clickable, colored, compact download links.
  */
 function formatDownloadColumn(entry: GameEntry): string {
   if (entry.downloadLinks && entry.downloadLinks.length > 0) {
     return entry.downloadLinks
-      .map((link: DownloadLink) => `[${link.hostName}] ${truncate(link.url, 80)}`)
-      .join('\n');
+      .map((link: DownloadLink) => {
+        const label = `\x1b[36m${link.hostName}\x1b[0m`;
+        return hyperlink(link.url, `📥 ${label}`);
+      })
+      .join('  ');
   }
-  return truncate(entry.downloadUrl, 80);
+  return hyperlink(entry.downloadUrl, `\x1b[36m📥 Download\x1b[0m`);
 }
 
 export function buildSummary(entries: GameEntry[]): string {
@@ -46,7 +57,7 @@ export function formatSearchResults(entries: GameEntry[], query: string, errors:
   }
 
   const table = new Table({
-    head: ['#', 'Game Name', 'Source', 'Download URL'],
+    head: ['#', 'Game Name', 'Source', 'Downloads'],
   });
 
   for (const entry of entries) {
@@ -77,7 +88,7 @@ export function formatResults(entries: GameEntry[], errors: string[]): string {
   }
 
   const table = new Table({
-    head: ['#', 'Game Name', 'Source', 'Download URL'],
+    head: ['#', 'Game Name', 'Source', 'Downloads'],
   });
 
   for (const entry of entries) {

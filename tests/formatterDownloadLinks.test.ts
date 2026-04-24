@@ -24,11 +24,13 @@ describe('formatResults with downloadLinks', () => {
     const entry = makeEntry({ downloadLinks, downloadUrl: downloadLinks[0].url });
     const output = formatResults([entry], []);
 
-    expect(output).toContain('[Mega]');
+    // Host names should appear in the output
+    expect(output).toContain('Mega');
+    expect(output).toContain('MediaFire');
+    expect(output).toContain('1fichier');
+    // URLs should be embedded in OSC 8 hyperlinks
     expect(output).toContain('mega.nz/file/abc123');
-    expect(output).toContain('[MediaFire]');
     expect(output).toContain('mediafire.com/file/xyz');
-    expect(output).toContain('[1fichier]');
     expect(output).toContain('1fichier.com/?abcdef');
   });
 
@@ -37,9 +39,6 @@ describe('formatResults with downloadLinks', () => {
     const output = formatResults([entry], []);
 
     expect(output).toContain('example.com/fallback.nsp');
-    // No host name labels should appear in the download column
-    expect(output).not.toMatch(/\[Mega\]/);
-    expect(output).not.toMatch(/\[MediaFire\]/);
   });
 
   it('falls back to downloadUrl when downloadLinks is undefined', () => {
@@ -47,9 +46,6 @@ describe('formatResults with downloadLinks', () => {
     const output = formatResults([entry], []);
 
     expect(output).toContain('example.com/fallback.nsp');
-    // No host name labels should appear in the download column
-    expect(output).not.toMatch(/\[Mega\]/);
-    expect(output).not.toMatch(/\[MediaFire\]/);
   });
 
   it('handles mixed entries: one with downloadLinks, one without', () => {
@@ -72,10 +68,8 @@ describe('formatResults with downloadLinks', () => {
     });
     const output = formatResults([withLinks, withoutLinks], []);
 
-    // Entry with downloadLinks shows host names
-    expect(output).toContain('[Mega]');
-    expect(output).toContain('[Gofile]');
-    // Entry without downloadLinks shows plain URL
+    expect(output).toContain('Mega');
+    expect(output).toContain('Gofile');
     expect(output).toContain('example.com/plain.nsp');
   });
 });
@@ -93,9 +87,9 @@ describe('formatSearchResults with downloadLinks', () => {
     });
     const output = formatSearchResults([entry], 'zelda', []);
 
-    expect(output).toContain('[Mega]');
+    expect(output).toContain('Mega');
     expect(output).toContain('mega.nz/file/search123');
-    expect(output).toContain('[Pixeldrain]');
+    expect(output).toContain('Pixeldrain');
     expect(output).toContain('pixeldrain.com/u/abc');
   });
 });

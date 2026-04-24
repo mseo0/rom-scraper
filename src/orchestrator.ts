@@ -221,8 +221,8 @@ export async function scrapeAll(sources: Source[], searchQuery?: string | null):
 
 /**
  * Resolve notUltraNX API download URLs to actual file download URLs.
- * The API returns a redirect (302) to the real file URL when given a valid token.
- * If resolution fails, keeps the original URL with the token appended.
+ * The API uses an auth_token cookie for download authentication.
+ * It returns a redirect (302) to the real file URL when given a valid token.
  */
 async function resolveUltraNXLinks(links: DownloadLink[], token: string): Promise<DownloadLink[]> {
   const resolved: DownloadLink[] = [];
@@ -235,23 +235,23 @@ async function resolveUltraNXLinks(links: DownloadLink[], token: string): Promis
 
     try {
       const response = await axios.get(link.url, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 'Cookie': `auth_token=${token}` },
         timeout: 15000,
         maxRedirects: 0,
         validateStatus: (s) => s >= 200 && s < 400,
       });
 
-      // If we get a redirect, use the Location header
+      // If we get a redirect, use the Location header as the real download URL
       if (response.status >= 300 && response.headers.location) {
-        resolved.push({ url: response.headers.location, hostName: link.hostName });
+        resolved.push({ url: response.headers.location, hostName: 'Direct Download' });
       } else {
-        // API returned the file directly — keep original URL with auth note
+        // API returned content directly — keep original URL
         resolved.push(link);
       }
     } catch (err: any) {
-      // Axios throws on 3xx when maxRedirects=0, check the redirect
+      // Axios throws on 3xx when maxRedirects=0, check for redirect
       if (err?.response?.status >= 300 && err?.response?.headers?.location) {
-        resolved.push({ url: err.response.headers.location, hostName: link.hostName });
+        resolved.push({ url: err.response.headers.location, hostName: 'Direct Download' });
       } else {
         // Resolution failed — keep original URL
         resolved.push(link);
