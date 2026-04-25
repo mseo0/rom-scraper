@@ -252,6 +252,10 @@ src/
     └── nxBrew.ts     # NXBrew catalog + detail parser
 ```
 
+## Recommended Tools
+
+- [nsz](https://github.com/nicoboss/nsz) — Highly recommended for handling `.nsz` and `.nsp` files. Supports compression, decompression, and verification of Nintendo Switch game files.
+
 ## Disclaimer
 
 This tool is for educational and personal use only. The developers are not responsible for how you use it. Respect the terms of service of the sites being scraped.
