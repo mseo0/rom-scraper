@@ -11,7 +11,21 @@
     "start": "node dist/index.js",
     "test": "vitest --run"
   },
-  "keywords": [],
+  "keywords": [
+    "nintendo-switch",
+    "switch",
+    "nsp",
+    "nsz",
+    "xci",
+    "rom",
+    "downloader",
+    "scraper",
+    "cli",
+    "terminal",
+    "emulator",
+    "game-manager",
+    "update-checker"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
