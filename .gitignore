@@ -4,3 +4,4 @@ dist/
 .vscode/
 tests/
 *.tsbuildinfo
+.DS_Store
