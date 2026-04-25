@@ -30,7 +30,7 @@ function formatSourceDownloadLines(
       const idx = counter.value;
       counter.value++;
       linkMap.set(idx, link.url);
-      return `${prefix}[${idx}] ${link.hostName}: \x1b[2m${link.url}\x1b[0m`;
+      return `${prefix}[${idx}] ${link.hostName}: \x1b[2m${truncate(link.url, 70)}\x1b[0m`;
     });
   }
   return [];
@@ -179,4 +179,65 @@ export function formatNewReleases(entries: MergedEntry[], errors: string[]): For
   }
 
   return { text: parts.join('\n'), linkMap };
+}
+
+/**
+ * Format a compact game list showing only game names and sources (no links).
+ * Used for the first step of the two-step selection UI.
+ */
+export function formatGameList(entries: MergedEntry[], header: string, errors: string[]): string {
+  if (entries.length === 0) {
+    const parts: string[] = [header];
+    if (errors.length > 0) {
+      parts.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
+    }
+    return parts.join('\n');
+  }
+
+  const lines: string[] = [header, ''];
+  for (const entry of entries) {
+    const sources = entry.sourceGroups.map(sg => sg.sourceName).join(', ');
+    const linkCount = entry.sourceGroups.reduce((sum, sg) => sum + sg.downloadLinks.length, 0);
+    lines.push(`  ${entry.index}. ${truncate(entry.gameName, 50)} \x1b[2m(${sources}) [${linkCount} links]\x1b[0m`);
+  }
+
+  if (errors.length > 0) {
+    lines.push('', 'Errors:', ...errors.map(e => `  - ${e}`));
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format the download links for a single MergedEntry.
+ * Returns the display text and a linkMap for clipboard copy.
+ * Link numbering starts at 1 for each game.
+ */
+export function formatGameLinks(entry: MergedEntry): FormattedOutput {
+  const linkMap = new Map<number, string>();
+  const counter = { value: 1 };
+  const lines: string[] = [
+    `${bold(truncate(entry.gameName, 60))}`,
+    '',
+  ];
+
+  for (const sg of entry.sourceGroups) {
+    if (entry.sourceGroups.length > 1) {
+      lines.push(`  ${sg.sourceName}`);
+    }
+    for (const link of sg.downloadLinks) {
+      const idx = counter.value++;
+      linkMap.set(idx, link.url);
+      // Show just the host name and domain — no full URL
+      let domain = '';
+      try { domain = ` \x1b[2m(${new URL(link.url).hostname})\x1b[0m`; } catch { /* ignore */ }
+      lines.push(`    [${idx}] ${link.hostName}${domain}`);
+    }
+  }
+
+  return { text: lines.join('\n'), linkMap };
+}
+
+function bold(s: string): string {
+  return `\x1b[1m${s}\x1b[0m`;
 }

@@ -2,9 +2,10 @@
 import * as readline from 'readline';
 import { TARGET_SOURCES } from './sources';
 import { scrapeAll } from './orchestrator';
-import { formatResults, formatSearchResults, formatNewReleases, truncate } from './formatter';
+import { formatSearchResults, formatNewReleases, formatGameList, formatGameLinks, truncate } from './formatter';
 import { searchGames } from './search';
 import { mergeEntries } from './merger';
+import { MergedEntry } from './types';
 import { runPingCommand } from './ping';
 import { copyToClipboard } from './clipboard';
 import { readConfig, writeConfig } from './auth';
@@ -152,26 +153,70 @@ function prompt(question: string): Promise<string> {
   });
 }
 
-// Alternate screen buffer helpers
-function enterAltScreen(): void {
-  process.stdout.write('\x1b[?1049h');
-  process.stdout.write('\x1b[H'); // move cursor to top-left
-}
+/**
+ * Two-step browse UI: game list → pick game → see links → copy → back to list.
+ * Works for both search results and new releases.
+ */
+async function browseResults(
+  entries: MergedEntry[],
+  header: string,
+  errors: string[],
+  isInteractive: boolean,
+): Promise<void> {
+  if (entries.length === 0) {
+    console.clear();
+    console.log(formatGameList(entries, header, errors));
+    if (isInteractive) {
+      await prompt(dim('\n  Press Enter to go back...'));
+    }
+    return;
+  }
 
-function leaveAltScreen(): void {
-  process.stdout.write('\x1b[?1049l');
+  // Game selection loop
+  while (true) {
+    console.clear();
+    console.log(formatGameList(entries, header, errors));
+    console.log('');
+
+    const answer = await prompt(green('  Select game #: '));
+    const lower = answer.toLowerCase();
+    if (lower === 'q' || lower === 'quit' || lower === 'exit' || answer === '') {
+      break;
+    }
+
+    const num = Number(answer);
+    if (isNaN(num) || !Number.isInteger(num) || num < 1 || num > entries.length) {
+      continue;
+    }
+
+    const entry = entries[num - 1];
+    const { text, linkMap } = formatGameLinks(entry);
+
+    if (linkMap.size === 0) {
+      continue;
+    }
+
+    // Link copy loop for selected game
+    console.clear();
+    console.log(text);
+    console.log('');
+    await runClipboardPrompt(linkMap);
+
+    // After exiting link prompt, loop back to game list
+    if (!isInteractive) {
+      break;
+    }
+  }
 }
 
 export async function runClipboardPrompt(
   linkMap: Map<number, string>,
-  isInteractive: boolean,
 ): Promise<void> {
   const maxKey = Math.max(...linkMap.keys());
 
   while (true) {
-    const answer = await prompt('Copy link #: ');
+    const answer = await prompt('  Copy link #: ');
 
-    // Exit commands: q, quit, exit, or empty string
     const lower = answer.toLowerCase();
     if (lower === 'q' || lower === 'quit' || lower === 'exit' || answer === '') {
       break;
@@ -180,12 +225,12 @@ export async function runClipboardPrompt(
     const num = Number(answer);
 
     if (isNaN(num) || !Number.isInteger(num)) {
-      console.log('Invalid input. Enter a link number or q to exit.');
+      console.log('  Invalid input. Enter a link number or q to go back.');
       continue;
     }
 
     if (num < 1 || num > maxKey) {
-      console.log(`Invalid link number. Enter a number between 1 and ${maxKey}.`);
+      console.log(`  Invalid link number. Enter a number between 1 and ${maxKey}.`);
       continue;
     }
 
@@ -193,9 +238,9 @@ export async function runClipboardPrompt(
     const result = copyToClipboard(url);
 
     if (result.success) {
-      console.log(`Copied [${num}]: ${truncate(url, 60)}`);
+      console.log(`  Copied [${num}]: ${truncate(url, 60)}`);
     } else {
-      console.log(`Clipboard error: ${result.error}`);
+      console.log(`  Clipboard error: ${result.error}`);
     }
   }
 }
@@ -204,19 +249,10 @@ async function runSearch(query: string, noValidate: boolean = false): Promise<vo
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, query, false, { validate: !noValidate });
   const merged = mergeEntries(entries);
   const filtered = searchGames(query, merged);
-  const { text, linkMap } = formatSearchResults(filtered, query, errors);
-
-  enterAltScreen();
-  const sigintHandler = () => { leaveAltScreen(); process.exit(0); };
-  process.on('SIGINT', sigintHandler);
-
-  console.log(text);
-  if (linkMap.size > 0) {
-    await runClipboardPrompt(linkMap, false);
-  }
-
-  process.removeListener('SIGINT', sigintHandler);
-  leaveAltScreen();
+  const header = filtered.length === 0
+    ? `No games found matching '${query}'.`
+    : `Found ${filtered.length} result(s) for '${query}':`;
+  await browseResults(filtered, header, errors, false);
 }
 
 async function interactiveMode(noValidate: boolean = false): Promise<void> {
@@ -245,37 +281,16 @@ async function interactiveMode(noValidate: boolean = false): Promise<void> {
     const { entries, errors } = await scrapeAll(TARGET_SOURCES, query, false, { validate: !noValidate });
     const merged = mergeEntries(entries);
     const filtered = searchGames(query, merged);
-    const { text, linkMap } = formatSearchResults(filtered, query, errors);
+    const header = filtered.length === 0
+      ? `No games found matching '${query}'.`
+      : `Found ${filtered.length} result(s) for '${query}':`;
+    await browseResults(filtered, header, errors, true);
 
-    // Show results on alternate screen so exiting returns to the search prompt
-    enterAltScreen();
-    let onAltScreen = true;
-
-    const exitAltScreen = () => {
-      if (onAltScreen) {
-        onAltScreen = false;
-        leaveAltScreen();
-      }
-    };
-
-    // Ctrl+C while on alt screen returns to search prompt
-    const sigintHandler = () => { exitAltScreen(); };
-    process.on('SIGINT', sigintHandler);
-
-    try {
-      console.log(text);
-      if (linkMap.size > 0) {
-        await runClipboardPrompt(linkMap, true);
-      } else {
-        await prompt(dim('\n  Press Enter to go back...'));
-      }
-    } catch {
-      // Interrupted — fall through
-    }
-
-    process.removeListener('SIGINT', sigintHandler);
-    exitAltScreen();
-
+    // Restore the interactive mode header after returning from browse
+    console.clear();
+    console.log('');
+    console.log(bold(cyan('  rom-scraper')));
+    console.log(dim('  Nintendo Switch ROM search tool'));
     console.log('');
   }
 }
@@ -283,19 +298,10 @@ async function interactiveMode(noValidate: boolean = false): Promise<void> {
 async function runNewReleases(noValidate: boolean = false): Promise<void> {
   const { entries, errors } = await scrapeAll(TARGET_SOURCES, null, true, { validate: !noValidate });
   const merged = mergeEntries(entries);
-  const { text, linkMap } = formatNewReleases(merged, errors);
-
-  enterAltScreen();
-  const sigintHandler = () => { leaveAltScreen(); process.exit(0); };
-  process.on('SIGINT', sigintHandler);
-
-  console.log(text);
-  if (linkMap.size > 0) {
-    await runClipboardPrompt(linkMap, false);
-  }
-
-  process.removeListener('SIGINT', sigintHandler);
-  leaveAltScreen();
+  const header = merged.length === 0
+    ? 'No new releases found.'
+    : `New Releases — ${merged.length} game(s) found:`;
+  await browseResults(merged, header, errors, false);
 }
 
 async function main(): Promise<void> {
