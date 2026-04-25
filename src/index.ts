@@ -6,12 +6,14 @@ import { TARGET_SOURCES } from './sources';
 import { scrapeAll } from './orchestrator';
 import { formatSearchResults, formatNewReleases, formatGameList, formatGameLinks, truncate } from './formatter';
 import { searchGames } from './search';
-import { mergeEntries } from './merger';
+import { mergeEntries, normalizeGameName } from './merger';
 import { MergedEntry } from './types';
 import { DownloadLink } from './fileHosts';
 import { runPingCommand } from './ping';
 import { copyToClipboard } from './clipboard';
 import { readConfig, writeConfig, resolveDownloadDir, getDownloadDir } from './auth';
+import { runInit } from './init';
+import { runCheckUpdates } from './updateChecker';
 import { downloadFile } from './downloader';
 import { createProgressBar } from './downloadProgress';
 import { decompressNsz, isNszFile } from './nsz';
@@ -32,6 +34,13 @@ export interface CliArgs {
   /** When set, -nv on/off was used — save to config and exit */
   validateToggle?: 'on' | 'off';
   downloadDir?: string;
+  init: boolean;
+  checkUpdates: boolean;
+  refreshCache: boolean;
+  ignoreAction?: {
+    type: 'add' | 'all' | 'reset' | 'list';
+    gameName?: string;
+  };
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -49,8 +58,17 @@ export function parseArgs(argv: string[]): CliArgs {
     switper                          Interactive search mode
 
   Commands:
+    init                             Run interactive setup wizard
+    check-updates                    Check for game updates
     --new                            Browse recently added games
     --ping                           Check if sources are reachable
+
+  Update Options:
+    --refresh                        Force a fresh scrape (with check-updates)
+    --ignore <game_name>             Add a game to the ignore list
+    --ignore all                     Suppress all update notifications
+    --ignore reset                   Clear the ignore list
+    --ignore list                    Show all ignored games
 
   Download:
     -d, --download-dir <path>        Set download directory
@@ -68,6 +86,34 @@ export function parseArgs(argv: string[]): CliArgs {
 
   const hasNew = args.includes('--new');
   const hasPing = args.includes('--ping');
+
+  // Detect subcommands: init and check-updates (first positional argument)
+  const hasInit = args[0] === 'init';
+  const hasCheckUpdates = args[0] === 'check-updates';
+
+  // Detect --refresh flag (only meaningful with check-updates)
+  const hasRefresh = args.includes('--refresh');
+
+  // Detect --ignore flag and parse its argument
+  const ignoreIndex = args.indexOf('--ignore');
+  let ignoreAction: CliArgs['ignoreAction'] | undefined;
+  if (ignoreIndex !== -1) {
+    const nextArg = args[ignoreIndex + 1];
+    if (nextArg === undefined || nextArg.trim() === '') {
+      console.error('Error: --ignore requires an argument (game name, "all", "reset", or "list").');
+      process.exit(1);
+    }
+    const lowerArg = nextArg.toLowerCase();
+    if (lowerArg === 'all') {
+      ignoreAction = { type: 'all' };
+    } else if (lowerArg === 'reset') {
+      ignoreAction = { type: 'reset' };
+    } else if (lowerArg === 'list') {
+      ignoreAction = { type: 'list' };
+    } else {
+      ignoreAction = { type: 'add', gameName: nextArg };
+    }
+  }
 
   // Check for -nv on / -nv off (persistent toggle)
   const nvIndex = args.indexOf('-nv');
@@ -121,9 +167,10 @@ export function parseArgs(argv: string[]): CliArgs {
       process.exit(1);
     }
     searchQuery = nextArg;
-  } else {
+  } else if (!hasInit && !hasCheckUpdates) {
     // Bare arguments (excluding flags and their values) become the search query
-    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv', '--download-dir', '-d']);
+    // Only when not using init or check-updates subcommands
+    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv', '--download-dir', '-d', '--refresh', '--ignore']);
     const skipIndices = new Set<number>();
     // Mark -nv and its on/off value for skipping
     if (nvIndex !== -1) {
@@ -140,6 +187,13 @@ export function parseArgs(argv: string[]): CliArgs {
         skipIndices.add(downloadDirIndex + 1);
       }
     }
+    // Mark --ignore and its argument for skipping
+    if (ignoreIndex !== -1) {
+      skipIndices.add(ignoreIndex);
+      if (args[ignoreIndex + 1] !== undefined) {
+        skipIndices.add(ignoreIndex + 1);
+      }
+    }
     const bareArgs = args.filter((a, i) => !flagArgs.has(a) && !skipIndices.has(i));
     if (bareArgs.length > 0) {
       const query = bareArgs.join(' ').trim();
@@ -147,7 +201,7 @@ export function parseArgs(argv: string[]): CliArgs {
     }
   }
 
-  // Conflict detection
+  // Conflict detection: existing conflicts
   if (hasNew && searchQuery !== null) {
     console.error('Error: --new and search query cannot be used together.');
     process.exit(1);
@@ -168,7 +222,34 @@ export function parseArgs(argv: string[]): CliArgs {
     process.exit(1);
   }
 
-  return { searchQuery, newReleases: hasNew, ping: hasPing, noValidate: hasNoValidate, validateToggle, downloadDir };
+  // Conflict detection: init and check-updates cannot combine with --search, --new, or each other
+  if (hasInit && hasCheckUpdates) {
+    console.error('Error: init and check-updates cannot be used together.');
+    process.exit(1);
+  }
+
+  if (hasInit && (searchQuery !== null || hasNew)) {
+    console.error('Error: init cannot be combined with --search or --new.');
+    process.exit(1);
+  }
+
+  if (hasCheckUpdates && (searchQuery !== null || hasNew)) {
+    console.error('Error: check-updates cannot be combined with --search or --new.');
+    process.exit(1);
+  }
+
+  return {
+    searchQuery,
+    newReleases: hasNew,
+    ping: hasPing,
+    noValidate: hasNoValidate,
+    validateToggle,
+    downloadDir,
+    init: hasInit,
+    checkUpdates: hasCheckUpdates,
+    refreshCache: hasRefresh,
+    ignoreAction,
+  };
 }
 
 function prompt(question: string): Promise<string> {
@@ -428,7 +509,10 @@ async function runNewReleases(noValidate: boolean = false): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const { searchQuery, newReleases, ping, noValidate, validateToggle, downloadDir } = parseArgs(process.argv);
+  const {
+    searchQuery, newReleases, ping, noValidate, validateToggle,
+    downloadDir, init, checkUpdates, refreshCache, ignoreAction,
+  } = parseArgs(process.argv);
 
   // Handle persistent toggle: switper -nv on / switper -nv off
   if (validateToggle) {
@@ -438,6 +522,64 @@ async function main(): Promise<void> {
     const state = validateToggle === 'on' ? 'enabled' : 'disabled';
     console.log(`Link validation ${state}.`);
     return;
+  }
+
+  // Route: switper init
+  if (init) {
+    await runInit();
+    return;
+  }
+
+  // Route: switper check-updates [--refresh]
+  if (checkUpdates) {
+    await runCheckUpdates({ forceRefresh: refreshCache, noValidate });
+    return;
+  }
+
+  // Route: switper --ignore <action>
+  if (ignoreAction) {
+    const config = readConfig() as Record<string, unknown>;
+    switch (ignoreAction.type) {
+      case 'add': {
+        const normalized = normalizeGameName(ignoreAction.gameName!);
+        const ignoreList = (config.ignoreList as string[] | undefined) ?? [];
+        if (!ignoreList.includes(normalized)) {
+          ignoreList.push(normalized);
+        }
+        config.ignoreList = ignoreList;
+        writeConfig(config as any);
+        console.log(`Added "${normalized}" to ignore list.`);
+        return;
+      }
+      case 'all': {
+        config.ignoreAll = true;
+        writeConfig(config as any);
+        console.log('All update notifications are now suppressed.');
+        return;
+      }
+      case 'reset': {
+        delete config.ignoreList;
+        delete config.ignoreAll;
+        writeConfig(config as any);
+        console.log('Ignore list cleared.');
+        return;
+      }
+      case 'list': {
+        const ignoreList = (config.ignoreList as string[] | undefined) ?? [];
+        const ignoreAll = (config.ignoreAll as boolean | undefined) ?? false;
+        if (ignoreAll) {
+          console.log('All games are currently ignored (--ignore all is set).');
+        } else if (ignoreList.length === 0) {
+          console.log('No games are currently ignored.');
+        } else {
+          console.log('Ignored games:');
+          for (const name of ignoreList) {
+            console.log(`  - ${name}`);
+          }
+        }
+        return;
+      }
+    }
   }
 
   // Handle --download-dir: resolve, save to config, print confirmation, then continue

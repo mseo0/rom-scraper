@@ -1,5 +1,7 @@
 import { MergedEntry, SourceGroup } from './types';
 import { DownloadLink } from './fileHosts';
+import { UpdateInfo } from './updateChecker';
+import { parseRomFilename } from './filenameParser';
 
 /** Structured output from format functions */
 export interface FormattedOutput {
@@ -38,6 +40,18 @@ function formatSourceDownloadLines(
 }
 
 /**
+ * Extract a version tag suffix from a game name using the ROM filename parser.
+ * Returns a dimmed ANSI string like " \x1b[2mv1.2.3\x1b[0m" or "" if no version found.
+ */
+function versionTag(gameName: string): string {
+  const parsed = parseRomFilename(gameName);
+  if (parsed.version) {
+    return ` \x1b[2mv${parsed.version}\x1b[0m`;
+  }
+  return '';
+}
+
+/**
  * Format a MergedEntry for console output.
  *
  * Single source (1 SourceGroup): backward-compatible format matching the
@@ -51,7 +65,7 @@ function formatEntry(
   counter: { value: number },
   linkMap: Map<number, DownloadLink>,
 ): string {
-  const heading = `${entry.index}. ${truncate(entry.gameName, 50)}`;
+  const heading = `${entry.index}. ${truncate(entry.gameName, 50)}${versionTag(entry.gameName)}`;
 
   if (entry.sourceGroups.length === 1) {
     // Single source — backward-compatible format
@@ -199,7 +213,7 @@ export function formatGameList(entries: MergedEntry[], header: string, errors: s
   for (const entry of entries) {
     const sources = entry.sourceGroups.map(sg => sg.sourceName).join(', ');
     const linkCount = entry.sourceGroups.reduce((sum, sg) => sum + sg.downloadLinks.length, 0);
-    lines.push(`  ${entry.index}. ${truncate(entry.gameName, 50)} \x1b[2m(${sources}) [${linkCount} links]\x1b[0m`);
+    lines.push(`  ${entry.index}. ${truncate(entry.gameName, 50)}${versionTag(entry.gameName)} \x1b[2m(${sources}) [${linkCount} links]\x1b[0m`);
   }
 
   if (errors.length > 0) {
@@ -242,4 +256,31 @@ export function formatGameLinks(entry: MergedEntry): FormattedOutput {
 
 function bold(s: string): string {
   return `\x1b[1m${s}\x1b[0m`;
+}
+
+/**
+ * Format the update check results for console output.
+ *
+ * When the list is empty, returns a green "all up to date" message.
+ * When updates are available, formats each entry showing game name,
+ * local version (or "unknown" if null), available version, and source name.
+ */
+export function formatUpdateResults(updates: UpdateInfo[]): string {
+  if (updates.length === 0) {
+    return '\x1b[32m✓ All games are up to date.\x1b[0m';
+  }
+
+  const lines: string[] = [
+    `\x1b[33m${updates.length} update(s) available:\x1b[0m`,
+    '',
+  ];
+
+  for (const update of updates) {
+    const localVer = update.localVersion ?? 'unknown';
+    lines.push(
+      `  • ${update.gameName}  ${localVer} → \x1b[32m${update.availableVersion}\x1b[0m  \x1b[2m(${update.sourceName})\x1b[0m`,
+    );
+  }
+
+  return lines.join('\n');
 }

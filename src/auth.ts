@@ -15,6 +15,9 @@ interface Config {
   };
   validate?: boolean;
   downloadDir?: string;
+  libraryDir?: string;
+  ignoreList?: string[];
+  ignoreAll?: boolean;
 }
 
 let cachedToken: string | null = null;
