@@ -4,7 +4,8 @@ import * as path from 'path';
 import * as os from 'os';
 import * as readline from 'readline';
 
-const CONFIG_PATH = path.join(os.homedir(), '.rom-scraper.json');
+const CONFIG_PATH = path.join(os.homedir(), '.switper.json');
+const LEGACY_CONFIG_PATH = path.join(os.homedir(), '.rom-scraper.json');
 const ULTRANX_API = 'https://api.ultranx.ru';
 
 interface Config {
@@ -17,8 +18,29 @@ interface Config {
 }
 
 let cachedToken: string | null = null;
+let migrationDone = false;
+
+/**
+ * One-time migration: if ~/.rom-scraper.json exists but ~/.switper.json does not,
+ * copy the old config to the new path and delete the old file.
+ */
+function migrateConfig(): void {
+  if (migrationDone) return;
+  migrationDone = true;
+
+  try {
+    if (fs.existsSync(LEGACY_CONFIG_PATH) && !fs.existsSync(CONFIG_PATH)) {
+      fs.copyFileSync(LEGACY_CONFIG_PATH, CONFIG_PATH);
+      fs.chmodSync(CONFIG_PATH, 0o600);
+      fs.unlinkSync(LEGACY_CONFIG_PATH);
+    }
+  } catch {
+    // Migration is best-effort — don't block startup
+  }
+}
 
 export function readConfig(): Config {
+  migrateConfig();
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     return JSON.parse(raw);
@@ -111,7 +133,7 @@ export async function getUltraNXToken(): Promise<string | null> {
   console.log('');
   console.log('\x1b[33m  notUltraNX requires a free account for downloads.\x1b[0m');
   console.log('\x1b[2m  Register at: https://not.ultranx.ru/en/register\x1b[0m');
-  console.log('\x1b[2m  Credentials saved to ~/.rom-scraper.json (chmod 600)\x1b[0m');
+  console.log('\x1b[2m  Credentials saved to ~/.switper.json (chmod 600)\x1b[0m');
   console.log('');
 
   const username = await askQuestion('\x1b[36m  Username: \x1b[0m');

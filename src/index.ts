@@ -41,12 +41,12 @@ export function parseArgs(argv: string[]): CliArgs {
   // --help / -h
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-  rom-scraper [options] [query]
+  switper [options] [query]
 
   Search:
-    rom-scraper <query>              Search by game name
-    rom-scraper -s <query>           Search (explicit flag)
-    rom-scraper                      Interactive search mode
+    switper <query>                  Search by game name
+    switper -s <query>               Search (explicit flag)
+    switper                          Interactive search mode
 
   Commands:
     --new                            Browse recently added games
@@ -380,7 +380,7 @@ async function runSearch(query: string, noValidate: boolean = false): Promise<vo
 
 async function interactiveMode(noValidate: boolean = false): Promise<void> {
   console.log('');
-  console.log(bold(cyan('  rom-scraper')));
+  console.log(bold(cyan('  switper')));
   console.log(dim('  Nintendo Switch ROM search tool'));
   console.log('');
 
@@ -412,7 +412,7 @@ async function interactiveMode(noValidate: boolean = false): Promise<void> {
     // Restore the interactive mode header after returning from browse
     console.clear();
     console.log('');
-    console.log(bold(cyan('  rom-scraper')));
+    console.log(bold(cyan('  switper')));
     console.log(dim('  Nintendo Switch ROM search tool'));
     console.log('');
   }
@@ -430,7 +430,7 @@ async function runNewReleases(noValidate: boolean = false): Promise<void> {
 async function main(): Promise<void> {
   const { searchQuery, newReleases, ping, noValidate, validateToggle, downloadDir } = parseArgs(process.argv);
 
-  // Handle persistent toggle: rom-scraper -nv on / rom-scraper -nv off
+  // Handle persistent toggle: switper -nv on / switper -nv off
   if (validateToggle) {
     const config = readConfig();
     config.validate = validateToggle === 'on';
@@ -464,10 +464,10 @@ async function main(): Promise<void> {
   } else if (newReleases) {
     await runNewReleases(noValidate);
   } else if (searchQuery !== null) {
-    // Direct search mode (rom-scraper zelda / rom-scraper --search zelda)
+    // Direct search mode (switper zelda / switper --search zelda)
     await runSearch(searchQuery, noValidate);
   } else {
-    // Interactive mode (just rom-scraper)
+    // Interactive mode (just switper)
     await interactiveMode(noValidate);
   }
 }

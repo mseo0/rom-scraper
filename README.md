@@ -1,4 +1,4 @@
-# rom-scraper
+# Switper
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)
@@ -33,7 +33,7 @@ npm run build
 If the issue persists, check that the source site is reachable:
 
 ```bash
-rom-scraper --ping
+switper --ping
 ```
 
 If after this the issue persists then open an issue.
@@ -44,7 +44,7 @@ If after this the issue persists then open an issue.
 
 ```bash
 git clone <this repo>
-cd rom-scraper
+cd switper
 npm install
 npm run build
 ```
@@ -56,22 +56,22 @@ npm run build
 npm install -g .
 ```
 
-After this you can run `rom-scraper` from anywhere.
+After this you can run `switper` from anywhere.
 
 ### Uninstall
 
 ```bash
-npm uninstall -g rom-scraper
+npm uninstall -g switper
 ```
 
 ## Account Setup
 
-notUltraNX requires a free account. Register at [not.ultranx.ru/en/register](https://not.ultranx.ru/en/register), then run `rom-scraper`. It will prompt for your credentials on first use and save them to `~/.rom-scraper.json` (chmod 600).
+notUltraNX requires a free account. Register at [not.ultranx.ru/en/register](https://not.ultranx.ru/en/register), then run `switper`. It will prompt for your credentials on first use and save them to `~/.switper.json` (chmod 600).
 
 ## Usage
 
 ```
-rom-scraper [options] [query]
+switper [options] [query]
 ```
 
 ### Search
@@ -79,16 +79,16 @@ rom-scraper [options] [query]
 Search by game name. Just type it:
 
 ```bash
-rom-scraper zelda
-rom-scraper fire emblem
-rom-scraper "mario kart"
+switper zelda
+switper fire emblem
+switper "mario kart"
 ```
 
 Or use the `--search` (or `-s`) flag:
 
 ```bash
-rom-scraper --search zelda
-rom-scraper -s zelda
+switper --search zelda
+switper -s zelda
 ```
 
 ### Interactive Mode
@@ -96,9 +96,9 @@ rom-scraper -s zelda
 Run without arguments for a search prompt that loops:
 
 ```
-$ rom-scraper
+$ switper
 
-  rom-scraper
+  switper
   Nintendo Switch ROM search tool
 
   Search Game: zelda
@@ -111,7 +111,7 @@ Type `exit`, `quit`, `q`, or press Enter on empty to exit.
 Browse recently added games without a search query:
 
 ```bash
-rom-scraper --new
+switper --new
 ```
 
 ```
@@ -129,7 +129,7 @@ New Releases — 3 game(s) found:
 Check if sources are up before searching:
 
 ```bash
-rom-scraper --ping
+switper --ping
 ```
 
 ```
@@ -152,23 +152,31 @@ Found 3 result(s) for 'zelda':
   Select game #: 2
 ```
 
-After selecting a game, its download links are shown with numbered entries:
+After selecting a game, its download links are shown with numbered entries. Links marked with ⬇ download directly in the CLI. Links marked with 🌐 open in the browser.
 
 ```
 The Legend of Zelda: Tears of the Kingdom
 
   notUltraNX
-    [1] Base Game (downloader.disk.yandex.ru)
-    [2] Update (downloader.disk.yandex.ru)
-    [3] Full Pack (downloader.disk.yandex.ru)
+    [1] ⬇ Base Game (downloader.disk.yandex.ru)
+    [2] ⬇ Update (downloader.disk.yandex.ru)
+    [3] ⬇ Full Pack (downloader.disk.yandex.ru)
   NXBrew
-    [4] 1fichier (1fichier.com)
+    [4] 🌐 1fichier (1fichier.com)
 
-  Copy link #: 1
-  Copied [1]: https://downloader.disk.yandex.ru/disk/...
+  Download link #: 1
+  Downloading [1]...
+  ⬇ [████████████████████] 100% 4.3 GB / 4.3 GB  15.2 MB/s  ETA 0s
+  ✓ Downloaded 4.3 GB → /Users/you/roms/game.nsz
+  ✓ nsz → Decompressed → /Users/you/roms/game.nsp
 ```
 
-You can copy multiple links in a row. Type `q` or press Enter to go back to the game list.
+Direct downloads include a progress bar with speed and ETA. After downloading:
+- `.zip` files are automatically extracted, then the zip is deleted
+- `.nsz` files are automatically decompressed to `.nsp` using [nsz](https://github.com/nicoboss/nsz), then the nsz is deleted
+- Hosts that can't be downloaded directly (Mega, 1fichier) open in the browser instead
+
+Type `q` or press Enter to go back to the game list.
 
 Download labels:
 - **Base Game** — the main game file
@@ -187,20 +195,30 @@ Download labels:
 | `--no-validate`, `-nv` | Skip dead link validation (one-off) |
 | `-nv off` | Disable link validation persistently |
 | `-nv on` | Re-enable link validation persistently |
+| `-d`, `--download-dir <path>` | Set download directory (saved to config) |
 | `-h`, `--help` | Show help message |
 
 Flags are mutually exclusive. You can't combine `--new`, `--ping`, or a search query.
 
 ### Link Validation
 
-By default, rom-scraper checks that download links are alive before showing them. This adds a few seconds per search. You can control this:
+By default, Switper checks that download links are alive before showing them. This adds a few seconds per search. You can control this:
 
 ```bash
-rom-scraper -nv off     # turn validation off (saved to ~/.rom-scraper.json)
-rom-scraper -nv on      # turn it back on
+switper -nv off     # turn validation off (saved to ~/.switper.json)
+switper -nv on      # turn it back on
 
-rom-scraper zelda       # uses your saved setting
-rom-scraper zelda -nv   # one-off skip, doesn't change saved setting
+switper zelda       # uses your saved setting
+switper zelda -nv   # one-off skip, doesn't change saved setting
+```
+
+### Download Directory
+
+By default, files download to the current working directory. Set a persistent download folder:
+
+```bash
+switper -d ~/roms           # saved to ~/.switper.json
+switper zelda               # downloads go to ~/roms
 ```
 
 ## Sources
@@ -234,27 +252,31 @@ npm run build     # compile TypeScript
 
 ```
 src/
-├── index.ts          # CLI entry point, argument parsing
-├── orchestrator.ts   # Scraping pipeline coordinator
-├── fetcher.ts        # HTTP fetching (static + browser)
-├── parser.ts         # Parser registry
-├── search.ts         # Game name filtering
-├── formatter.ts      # Console output formatting
-├── clipboard.ts      # Cross-platform clipboard copy
-├── progress.ts       # Animated spinner
-├── ping.ts           # Source health checks
-├── fileHosts.ts      # File host domain registry
-├── auth.ts           # notUltraNX authentication
-├── sources.ts        # Source configuration
-├── types.ts          # TypeScript interfaces
+├── index.ts              # CLI entry point, argument parsing
+├── orchestrator.ts       # Scraping pipeline coordinator
+├── fetcher.ts            # HTTP fetching (static + browser)
+├── parser.ts             # Parser registry
+├── search.ts             # Game name filtering
+├── formatter.ts          # Console output formatting
+├── downloader.ts         # HTTP file downloader with progress
+├── downloadProgress.ts   # Download progress bar rendering
+├── nsz.ts                # NSZ → NSP auto-decompression
+├── zip.ts                # ZIP auto-extraction
+├── clipboard.ts          # Cross-platform clipboard copy
+├── progress.ts           # Animated spinner
+├── ping.ts               # Source health checks
+├── fileHosts.ts          # File host domain registry + classification
+├── auth.ts               # Authentication + config management
+├── sources.ts            # Source configuration
+├── types.ts              # TypeScript interfaces
 └── parsers/
-    ├── notUltraNX.ts # notUltraNX catalog + detail parser
-    └── nxBrew.ts     # NXBrew catalog + detail parser
+    ├── notUltraNX.ts     # notUltraNX catalog + detail parser
+    └── nxBrew.ts         # NXBrew catalog + detail parser
 ```
 
 ## Recommended Tools
 
-- [nsz](https://github.com/nicoboss/nsz) — Highly recommended for handling `.nsz` and `.nsp` files. Supports compression, decompression, and verification of Nintendo Switch game files.
+- [nsz](https://github.com/nicoboss/nsz) — Highly recommended. If installed, Switper automatically decompresses `.nsz` files to `.nsp` after downloading. Install it and make sure `nsz` is on your PATH.
 
 ## Disclaimer
 
@@ -264,7 +286,7 @@ This tool is for educational and personal use only. The developers are not respo
 
 - **Links can go dead at any time.** File hosts regularly remove content due to DMCA takedowns, inactivity, or abuse reports. A link that works today may not work tomorrow.
 - **No guarantees on file integrity.** This tool scrapes links from third-party sites. It does not verify that downloaded files are safe, complete, or free of malware. Always scan downloads with antivirus software.
-- **Source sites change without notice.** ROM catalog sites frequently change their HTML structure, domains, or access requirements. This can break scraping at any time. Run `rom-scraper --ping` to check source availability.
+- **Source sites change without notice.** ROM catalog sites frequently change their HTML structure, domains, or access requirements. This can break scraping at any time. Run `switper --ping` to check source availability.
 - **Results vary by source.** Different sources may list different games, use different naming conventions, or have different link quality. Cross-source merging is best-effort based on game name similarity.
 - **File host availability varies by region.** Some file hosts may be blocked or throttled in certain countries. If a download link doesn't work, try a different source or host.
 - **This tool does not host or distribute any files.** It only aggregates publicly available links from third-party websites.

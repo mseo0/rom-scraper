@@ -1,10 +1,10 @@
 {
-  "name": "rom-scraper",
+  "name": "switper",
   "version": "1.0.0",
-  "description": "Scrapes various sites for rom files",
+  "description": "Search, browse, and download Nintendo Switch ROMs from your terminal",
   "main": "dist/index.js",
   "bin": {
-    "rom-scraper": "dist/index.js"
+    "switper": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
