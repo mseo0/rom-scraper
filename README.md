@@ -33,7 +33,7 @@ That's it. On first run, Switper automatically walks you through setup before se
 2. Search for game, click through pages
 3. Find download link, click through file host redirects
 4. Wait for countdown timers, solve CAPTCHAs
-5. Download finishes — it's an NSZ, now find a decompressor
+5. Download finishes, then decompresses to an NSZ
 6. Repeat for updates and DLC
 7. Manually check if your ROMs have newer versions available
 
