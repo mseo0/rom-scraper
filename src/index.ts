@@ -120,6 +120,7 @@ export function parseArgs(argv: string[]): CliArgs {
   const noValidateIndex = args.indexOf('--no-validate');
   let validateToggle: 'on' | 'off' | undefined;
   let hasNoValidate = false;
+  let explicitNoValidate = false;
 
   if (nvIndex !== -1) {
     const nextArg = args[nvIndex + 1]?.toLowerCase();
@@ -128,11 +129,13 @@ export function parseArgs(argv: string[]): CliArgs {
     } else {
       // -nv without on/off is a one-off override
       hasNoValidate = true;
+      explicitNoValidate = true;
     }
   }
 
   if (noValidateIndex !== -1) {
     hasNoValidate = true;
+    explicitNoValidate = true;
   }
 
   // If no explicit flag, check persistent config.
@@ -218,7 +221,7 @@ export function parseArgs(argv: string[]): CliArgs {
     process.exit(1);
   }
 
-  if (hasNoValidate && hasPing) {
+  if (explicitNoValidate && hasPing) {
     console.error('Error: --no-validate and --ping cannot be used together.');
     process.exit(1);
   }
