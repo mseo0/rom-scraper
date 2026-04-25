@@ -92,7 +92,7 @@ To uninstall: `npm uninstall -g switper`
 
 ## Account Setup
 
-notUltraNX requires a free account. Register at [not.ultranx.ru/en/register](https://not.ultranx.ru/en/register), then run `switper`. It will prompt for your credentials on first use and save them to `~/.switper.json` (chmod 600).
+notUltraNX requires a free account. Register at [not.ultranx.ru/en/register](https://not.ultranx.ru/en/register) (use an ad blocker like uBlock Origin when visiting). This is a one-time step — after that, Switper communicates with the API directly and you never need to visit the site again. Run `switper` and it will prompt for your credentials, saving them locally to `~/.switper.json` (chmod 600).
 
 ## Usage
 

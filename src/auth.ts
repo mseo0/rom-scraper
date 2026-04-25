@@ -136,6 +136,8 @@ export async function getUltraNXToken(): Promise<string | null> {
   console.log('');
   console.log('\x1b[33m  notUltraNX requires a free account for downloads.\x1b[0m');
   console.log('\x1b[2m  Register at: https://not.ultranx.ru/en/register\x1b[0m');
+  console.log('\x1b[2m  Tip: Use an ad blocker (uBlock Origin) when visiting the site.\x1b[0m');
+  console.log('\x1b[2m  After registering, Switper talks to the API directly — no more site visits.\x1b[0m');
   console.log('\x1b[2m  Credentials saved to ~/.switper.json (chmod 600)\x1b[0m');
   console.log('');
 

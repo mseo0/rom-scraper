@@ -74,9 +74,9 @@ export function parseArgs(argv: string[]): CliArgs {
     -d, --download-dir <path>        Set download directory
 
   Validation:
+    -nv on                           Enable link validation persistently
+    -nv off                          Disable validation persistently (default)
     -nv, --no-validate               Skip link validation (one-off)
-    -nv off                          Disable validation persistently
-    -nv on                           Re-enable validation persistently
 
   Other:
     -h, --help                       Show this help message
@@ -135,10 +135,11 @@ export function parseArgs(argv: string[]): CliArgs {
     hasNoValidate = true;
   }
 
-  // If no explicit flag, check persistent config
+  // If no explicit flag, check persistent config.
+  // Default is no-validate (validation off) unless config.validate is explicitly true.
   if (!hasNoValidate && !validateToggle) {
     const config = readConfig();
-    if (config.validate === false) {
+    if (config.validate !== true) {
       hasNoValidate = true;
     }
   }
