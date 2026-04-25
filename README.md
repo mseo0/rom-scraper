@@ -11,7 +11,7 @@
 ![Nintendo Switch](https://img.shields.io/badge/Nintendo%20Switch-E60012?logo=nintendoswitch&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-411%20passed-brightgreen)
 
-One command to search multiple ROM sources, merge results, download directly with a progress bar, auto-decompress NSZ files, and check your library for updates. No browser needed.
+One command to search multiple ROM sources, merge results, download directly with a progress bar, and check your library for updates. No browser needed.
 
 <!-- Replace this comment with a GIF demo: record with https://github.com/charmbracelet/vhs or https://asciinema.org -->
 <!-- Example: ![demo](assets/demo.gif) -->
@@ -47,7 +47,7 @@ switper --update            # scan your library, see what's outdated
 
 - **Search across multiple sources** — queries notUltraNX and NXBrew simultaneously, merges results by game name
 - **Download directly from the terminal** — progress bar with speed and ETA, no browser needed
-- **Auto-decompress** — NSZ → NSP and ZIP extraction happen automatically after download
+- **Post-download options** — after downloading, Switper asks if you want to extract ZIPs and decompress NSZ → NSP (requires [nsz](https://github.com/nicoboss/nsz) for decompression, optional)
 - **Check for updates** — scans your local ROM library, parses filenames, compares against scraped data, tells you what's outdated
 - **Dead link filtering** — validates download links before showing them so you don't waste time on broken links
 - **Fuzzy name matching** — normalizes messy ROM filenames (`Game Name [v1.2.3] [0100ABC012345000] (USA).nsp`) to match against catalog listings
@@ -146,13 +146,15 @@ The Legend of Zelda: Tears of the Kingdom
   Downloading [1]...
   ⬇ [████████████████████] 100% 4.3 GB / 4.3 GB  15.2 MB/s  ETA 0s
   ✓ Downloaded 4.3 GB → /Users/you/roms/game.nsz
+  Extract zip? (Y/n): y
+  Decompress NSZ → NSP? (Y/n): y
   ✓ nsz → Decompressed → /Users/you/roms/game.nsp
 ```
 
 - ⬇ = downloads directly in the CLI
 - 🌐 = opens in the browser (Mega, 1fichier, etc.)
-- `.nsz` files are auto-decompressed to `.nsp` (requires [nsz](https://github.com/nicoboss/nsz) on PATH)
-- `.zip` files are auto-extracted
+- After downloading, Switper asks if you want to extract `.zip` files and decompress `.nsz` → `.nsp`
+- NSZ decompression requires [nsz](https://github.com/nicoboss/nsz) on PATH (optional — most emulators play `.nsz` directly)
 
 Download labels: **Base Game** | **Update** | **Full Pack** | **DLC**
 
@@ -266,7 +268,7 @@ switper -d ~/roms           # saved to ~/.switper.json
 
 ### Recommended
 
-- [nsz](https://github.com/nicoboss/nsz) — If installed, Switper auto-decompresses `.nsz` → `.nsp` after downloading
+- [nsz](https://github.com/nicoboss/nsz) — Optional. If installed, Switper can decompress `.nsz` → `.nsp` after downloading. Most emulators play `.nsz` directly so this isn't required.
 
 ## Development
 
@@ -292,8 +294,8 @@ src/
 ├── downloader.ts         # HTTP file downloader with progress
 ├── downloadProgress.ts   # Download progress bar rendering
 ├── merger.ts             # Cross-source game name merging
-├── nsz.ts                # NSZ → NSP auto-decompression
-├── zip.ts                # ZIP auto-extraction
+├── nsz.ts                # NSZ → NSP decompression (optional)
+├── zip.ts                # ZIP extraction
 ├── clipboard.ts          # Cross-platform clipboard copy
 ├── progress.ts           # Animated spinner
 ├── ping.ts               # Source health checks
