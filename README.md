@@ -13,8 +13,7 @@
 
 One command to search multiple ROM sources, merge results, download directly with a progress bar, and check your library for updates. No browser needed.
 
-<!-- Replace this comment with a GIF demo: record with https://github.com/charmbracelet/vhs or https://asciinema.org -->
-<!-- Example: ![demo](assets/demo.gif) -->
+![demo](demo.gif)
 
 ## Quick Start
 

@@ -5,3 +5,5 @@ dist/
 tests/
 *.tsbuildinfo
 .DS_Store
+demo.tape
+
