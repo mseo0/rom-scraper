@@ -13,6 +13,7 @@ interface Config {
     password: string;
   };
   validate?: boolean;
+  downloadDir?: string;
 }
 
 let cachedToken: string | null = null;
@@ -59,6 +60,32 @@ async function loginUltraNX(username: string, password: string): Promise<string 
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve a download directory path to an absolute path.
+ * Expands ~ to os.homedir(). Returns the resolved absolute path.
+ */
+export function resolveDownloadDir(inputPath: string): string {
+  if (inputPath.startsWith('~')) {
+    inputPath = path.join(os.homedir(), inputPath.slice(1));
+  }
+  return path.resolve(inputPath);
+}
+
+/**
+ * Get the effective download directory from config, flag, or default.
+ * Priority: flagValue > config.downloadDir > process.cwd()
+ */
+export function getDownloadDir(flagValue?: string): string {
+  if (flagValue) {
+    return resolveDownloadDir(flagValue);
+  }
+  const config = readConfig();
+  if (config.downloadDir) {
+    return config.downloadDir;
+  }
+  return process.cwd();
 }
 
 /**

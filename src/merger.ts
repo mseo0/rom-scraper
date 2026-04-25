@@ -161,7 +161,7 @@ export function mergeEntries(entries: GameEntry[]): MergedEntry[] {
     // fall back to wrapping downloadUrl in a single DownloadLink
     const links: DownloadLink[] = entry.downloadLinks !== undefined
       ? entry.downloadLinks
-      : [{ url: entry.downloadUrl, hostName: '' }];
+      : [{ url: entry.downloadUrl, hostName: '', hostType: 'direct' as const }];
 
     sourceGroup.downloadLinks.push(...links);
   }

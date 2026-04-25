@@ -1,19 +1,22 @@
-/** Recognized file hosting domains mapped to display names */
-const FILE_HOST_DOMAINS: Map<string, string> = new Map([
-  ['mega.nz', 'Mega'],
-  ['mega.io', 'Mega'],
-  ['drive.google.com', 'Google Drive'],
-  ['mediafire.com', 'MediaFire'],
-  ['1fichier.com', '1fichier'],
-  ['megaup.net', 'MegaUp'],
-  ['sendcm.com', 'SendCM'],
-  ['doodrive.com', 'DooDrive'],
-  ['uptobox.com', 'Uptobox'],
-  ['gofile.io', 'Gofile'],
-  ['pixeldrain.com', 'Pixeldrain'],
-  ['krakenfiles.com', 'KrakenFiles'],
-  ['buzzheavier.com', 'Buzzheavier'],
-  ['api.ultranx.ru', 'notUltraNX'],
+/** Classification of how a host's links should be handled */
+export type HostType = 'direct' | 'browser-only';
+
+/** Recognized file hosting domains mapped to display names and host types */
+const FILE_HOST_DOMAINS: Map<string, { hostName: string; hostType: HostType }> = new Map([
+  ['mega.nz', { hostName: 'Mega', hostType: 'browser-only' }],
+  ['mega.io', { hostName: 'Mega', hostType: 'browser-only' }],
+  ['drive.google.com', { hostName: 'Google Drive', hostType: 'direct' }],
+  ['mediafire.com', { hostName: 'MediaFire', hostType: 'direct' }],
+  ['1fichier.com', { hostName: '1fichier', hostType: 'browser-only' }],
+  ['megaup.net', { hostName: 'MegaUp', hostType: 'direct' }],
+  ['sendcm.com', { hostName: 'SendCM', hostType: 'direct' }],
+  ['doodrive.com', { hostName: 'DooDrive', hostType: 'direct' }],
+  ['uptobox.com', { hostName: 'Uptobox', hostType: 'direct' }],
+  ['gofile.io', { hostName: 'Gofile', hostType: 'direct' }],
+  ['pixeldrain.com', { hostName: 'Pixeldrain', hostType: 'direct' }],
+  ['krakenfiles.com', { hostName: 'KrakenFiles', hostType: 'direct' }],
+  ['buzzheavier.com', { hostName: 'Buzzheavier', hostType: 'direct' }],
+  ['api.ultranx.ru', { hostName: 'notUltraNX', hostType: 'direct' }],
 ]);
 
 /** Known intermediary / ad gate domains */
@@ -29,6 +32,12 @@ const ROM_EXTENSIONS = ['.nsp', '.xci', '.nsz'];
 export interface DownloadLink {
   url: string;
   hostName: string;
+  hostType: HostType;
+}
+
+/** Check if a DownloadLink is directly downloadable */
+export function isDirectDownload(link: DownloadLink): boolean {
+  return link.hostType === 'direct';
 }
 
 /**
@@ -42,7 +51,7 @@ function tryParseUrl(url: string): URL | null {
   }
 }
 
-/** Known non-download paths on file host domains (abuse pages, terms, etc.) */
+/** Known non-download path on file host domains (abuse pages, terms, etc.) */
 const REJECTED_PATHS: string[] = [
   '/abuse', '/terms', '/about', '/contact', '/privacy', '/dmca',
   '/tos', '/faq', '/help', '/login', '/register', '/signup',
@@ -74,7 +83,7 @@ export function matchFileHost(url: string): DownloadLink | null {
     }
   }
 
-  for (const [domain, hostName] of FILE_HOST_DOMAINS) {
+  for (const [domain, hostInfo] of FILE_HOST_DOMAINS) {
     if (hostname === domain || hostname.endsWith('.' + domain)) {
       // Reject 1fichier affiliate-only links: URLs where the only query
       // parameter is "af" (affiliate ID) with no file identifier.
@@ -89,14 +98,14 @@ export function matchFileHost(url: string): DownloadLink | null {
         }
       }
 
-      return { url, hostName };
+      return { url, hostName: hostInfo.hostName, hostType: hostInfo.hostType };
     }
   }
 
   // Check for known ROM file extensions
   for (const ext of ROM_EXTENSIONS) {
     if (pathname.endsWith(ext)) {
-      return { url, hostName: 'Direct Download' };
+      return { url, hostName: 'Direct Download', hostType: 'direct' };
     }
   }
 
@@ -145,8 +154,12 @@ export function filterDownloadLinks(urls: string[]): DownloadLink[] {
 /**
  * Add a new file host domain at runtime (for extensibility).
  */
-export function registerFileHost(domain: string, hostName: string): void {
-  FILE_HOST_DOMAINS.set(domain.toLowerCase(), hostName);
+export function registerFileHost(
+  domain: string,
+  hostName: string,
+  hostType: HostType = 'direct',
+): void {
+  FILE_HOST_DOMAINS.set(domain.toLowerCase(), { hostName, hostType });
 }
 
 /**

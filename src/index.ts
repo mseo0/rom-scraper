@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 import * as readline from 'readline';
+import * as fs from 'fs';
+import { execSync } from 'child_process';
 import { TARGET_SOURCES } from './sources';
 import { scrapeAll } from './orchestrator';
 import { formatSearchResults, formatNewReleases, formatGameList, formatGameLinks, truncate } from './formatter';
 import { searchGames } from './search';
 import { mergeEntries } from './merger';
 import { MergedEntry } from './types';
+import { DownloadLink } from './fileHosts';
 import { runPingCommand } from './ping';
 import { copyToClipboard } from './clipboard';
-import { readConfig, writeConfig } from './auth';
+import { readConfig, writeConfig, resolveDownloadDir, getDownloadDir } from './auth';
+import { downloadFile } from './downloader';
+import { createProgressBar } from './downloadProgress';
+import { decompressNsz, isNszFile } from './nsz';
+import { extractZip, isZipFile } from './zip';
 
 // ANSI color helpers
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
@@ -24,6 +31,7 @@ export interface CliArgs {
   noValidate: boolean;
   /** When set, -nv on/off was used — save to config and exit */
   validateToggle?: 'on' | 'off';
+  downloadDir?: string;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -43,6 +51,9 @@ export function parseArgs(argv: string[]): CliArgs {
   Commands:
     --new                            Browse recently added games
     --ping                           Check if sources are reachable
+
+  Download:
+    -d, --download-dir <path>        Set download directory
 
   Validation:
     -nv, --no-validate               Skip link validation (one-off)
@@ -86,6 +97,19 @@ export function parseArgs(argv: string[]): CliArgs {
     }
   }
 
+  // Check for --download-dir / -d flag
+  let downloadDirIndex = args.indexOf('--download-dir');
+  if (downloadDirIndex === -1) downloadDirIndex = args.indexOf('-d');
+  let downloadDir: string | undefined;
+  if (downloadDirIndex !== -1) {
+    const nextArg = args[downloadDirIndex + 1];
+    if (nextArg === undefined || nextArg.trim() === '') {
+      console.error('Error: --download-dir requires a path argument.');
+      process.exit(1);
+    }
+    downloadDir = nextArg;
+  }
+
   // Check for --search or -s flag
   let searchIndex = args.indexOf('--search');
   if (searchIndex === -1) searchIndex = args.indexOf('-s');
@@ -99,7 +123,7 @@ export function parseArgs(argv: string[]): CliArgs {
     searchQuery = nextArg;
   } else {
     // Bare arguments (excluding flags and their values) become the search query
-    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv']);
+    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv', '--download-dir', '-d']);
     const skipIndices = new Set<number>();
     // Mark -nv and its on/off value for skipping
     if (nvIndex !== -1) {
@@ -107,6 +131,13 @@ export function parseArgs(argv: string[]): CliArgs {
       const nextArg = args[nvIndex + 1]?.toLowerCase();
       if (nextArg === 'on' || nextArg === 'off') {
         skipIndices.add(nvIndex + 1);
+      }
+    }
+    // Mark --download-dir / -d and its path value for skipping
+    if (downloadDirIndex !== -1) {
+      skipIndices.add(downloadDirIndex);
+      if (args[downloadDirIndex + 1] !== undefined) {
+        skipIndices.add(downloadDirIndex + 1);
       }
     }
     const bareArgs = args.filter((a, i) => !flagArgs.has(a) && !skipIndices.has(i));
@@ -137,7 +168,7 @@ export function parseArgs(argv: string[]): CliArgs {
     process.exit(1);
   }
 
-  return { searchQuery, newReleases: hasNew, ping: hasPing, noValidate: hasNoValidate, validateToggle };
+  return { searchQuery, newReleases: hasNew, ping: hasPing, noValidate: hasNoValidate, validateToggle, downloadDir };
 }
 
 function prompt(question: string): Promise<string> {
@@ -196,11 +227,11 @@ async function browseResults(
       continue;
     }
 
-    // Link copy loop for selected game
+    // Link download loop for selected game
     console.clear();
     console.log(text);
     console.log('');
-    await runClipboardPrompt(linkMap);
+    await runLinkPrompt(linkMap);
 
     // After exiting link prompt, loop back to game list
     if (!isInteractive) {
@@ -209,13 +240,35 @@ async function browseResults(
   }
 }
 
-export async function runClipboardPrompt(
-  linkMap: Map<number, string>,
+/**
+ * Open a URL in the default browser.
+ */
+function openInBrowser(url: string): boolean {
+  try {
+    const platform = process.platform;
+    if (platform === 'darwin') {
+      // -g opens in background, keeping terminal in front
+      execSync(`open -g "${url}"`, { stdio: 'ignore' });
+    } else if (platform === 'linux') {
+      execSync(`xdg-open "${url}"`, { stdio: 'ignore' });
+    } else if (platform === 'win32') {
+      execSync(`start "" "${url}"`, { stdio: 'ignore' });
+    } else {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function runLinkPrompt(
+  linkMap: Map<number, DownloadLink>,
 ): Promise<void> {
   const maxKey = Math.max(...linkMap.keys());
 
   while (true) {
-    const answer = await prompt('  Copy link #: ');
+    const answer = await prompt('  Download link #: ');
 
     const lower = answer.toLowerCase();
     if (lower === 'q' || lower === 'quit' || lower === 'exit' || answer === '') {
@@ -234,13 +287,83 @@ export async function runClipboardPrompt(
       continue;
     }
 
-    const url = linkMap.get(num)!;
-    const result = copyToClipboard(url);
+    const link = linkMap.get(num)!;
 
-    if (result.success) {
-      console.log(`  Copied [${num}]: ${truncate(url, 60)}`);
+    if (link.hostType === 'direct') {
+      console.log(`  Downloading [${num}]...`);
+      const downloadDir = getDownloadDir();
+      const progressBar = createProgressBar({ totalBytes: null });
+      let progressTotalBytes: number | null = null;
+
+      const result = await downloadFile({
+        url: link.url,
+        downloadDir,
+        onProgress: (progress) => {
+          if (progressTotalBytes === null && progress.totalBytes !== null) {
+            progressTotalBytes = progress.totalBytes;
+            // Recreate progress bar with known total (update closure)
+          }
+          progressBar.update(progress.bytesDownloaded, progress.speedBytesPerSec);
+        },
+      });
+
+      if (result.success) {
+        progressBar.finish(result.totalBytes, result.filePath);
+
+        // Post-download pipeline: zip extract → nsz decompress → cleanup
+        let filesToProcess = [result.filePath];
+
+        // Step 1: Extract zip if needed
+        if (isZipFile(result.filePath)) {
+          const extractResult = await extractZip(result.filePath);
+          if (extractResult.success) {
+            filesToProcess = extractResult.files;
+            // Trash the zip file
+            try { fs.unlinkSync(result.filePath); } catch { /* ignore */ }
+          } else {
+            console.log(`  Extraction failed: ${extractResult.error}`);
+          }
+        }
+
+        // Step 2: Decompress any .nsz files found
+        for (const file of filesToProcess) {
+          if (isNszFile(file)) {
+            const decompressResult = await decompressNsz(file);
+            if (decompressResult.success) {
+              // Trash the .nsz file after successful decompression
+              try { fs.unlinkSync(file); } catch { /* ignore */ }
+            } else {
+              console.log(`  ${decompressResult.error}`);
+            }
+          }
+        }
+      } else {
+        // Download failed — print error and fall back to browser
+        const statusMsg = result.statusCode ? ` (${result.statusCode})` : '';
+        console.log(`  Download failed${statusMsg}: ${result.error}`);
+        console.log(`  Opening in browser...`);
+        if (!openInBrowser(link.url)) {
+          const clipResult = copyToClipboard(link.url);
+          if (clipResult.success) {
+            console.log(`  Copied URL to clipboard: ${truncate(link.url, 60)}`);
+          } else {
+            console.log(`  Could not open or copy link. URL: ${link.url}`);
+          }
+        }
+      }
     } else {
-      console.log(`  Clipboard error: ${result.error}`);
+      // browser-only host
+      console.log(`  Opening [${num}] in browser...`);
+      if (openInBrowser(link.url)) {
+        console.log(`  Opened: ${truncate(link.url, 60)}`);
+      } else {
+        const clipResult = copyToClipboard(link.url);
+        if (clipResult.success) {
+          console.log(`  Copied [${num}]: ${truncate(link.url, 60)}`);
+        } else {
+          console.log(`  Could not open or copy link. URL: ${link.url}`);
+        }
+      }
     }
   }
 }
@@ -305,7 +428,7 @@ async function runNewReleases(noValidate: boolean = false): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const { searchQuery, newReleases, ping, noValidate, validateToggle } = parseArgs(process.argv);
+  const { searchQuery, newReleases, ping, noValidate, validateToggle, downloadDir } = parseArgs(process.argv);
 
   // Handle persistent toggle: rom-scraper -nv on / rom-scraper -nv off
   if (validateToggle) {
@@ -315,6 +438,25 @@ async function main(): Promise<void> {
     const state = validateToggle === 'on' ? 'enabled' : 'disabled';
     console.log(`Link validation ${state}.`);
     return;
+  }
+
+  // Handle --download-dir: resolve, save to config, print confirmation, then continue
+  if (downloadDir) {
+    const resolved = resolveDownloadDir(downloadDir);
+    const config = readConfig();
+    config.downloadDir = resolved;
+    writeConfig(config);
+    console.log(`Download directory set to: ${resolved}`);
+  }
+
+  // Validate that the effective download directory is writable
+  const effectiveDownloadDir = getDownloadDir();
+  try {
+    fs.mkdirSync(effectiveDownloadDir, { recursive: true });
+    fs.accessSync(effectiveDownloadDir, fs.constants.W_OK);
+  } catch {
+    console.error(`Error: Download directory is not writable: ${effectiveDownloadDir}`);
+    process.exit(1);
   }
 
   if (ping) {

@@ -106,6 +106,7 @@ export async function scrapeAll(
             downloadLinks = downloadLinks.map((link) => ({
               url: link.url,
               hostName: labelFromApiUrl(link.url),
+              hostType: link.hostType,
             }));
           }
 
@@ -172,7 +173,7 @@ export async function scrapeAll(
         entry.index = index++;
         // Wrap downloadUrl into downloadLinks for backward compatibility
         if (!entry.downloadLinks || entry.downloadLinks.length === 0) {
-          entry.downloadLinks = [{ url: entry.downloadUrl, hostName: 'Direct Download' }];
+          entry.downloadLinks = [{ url: entry.downloadUrl, hostName: 'Direct Download', hostType: 'direct' }];
         }
 
         // Validate download links (unless --no-validate)
@@ -237,13 +238,13 @@ async function resolveUltraNXLinks(links: DownloadLink[], token: string): Promis
       });
 
       if (response.status >= 300 && response.headers.location) {
-        resolved.push({ url: response.headers.location, hostName: link.hostName });
+        resolved.push({ url: response.headers.location, hostName: link.hostName, hostType: link.hostType });
       } else {
         resolved.push(link);
       }
     } catch (err: any) {
       if (err?.response?.status >= 300 && err?.response?.headers?.location) {
-        resolved.push({ url: err.response.headers.location, hostName: link.hostName });
+        resolved.push({ url: err.response.headers.location, hostName: link.hostName, hostType: link.hostType });
       } else {
         resolved.push(link);
       }

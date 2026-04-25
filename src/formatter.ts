@@ -4,7 +4,7 @@ import { DownloadLink } from './fileHosts';
 /** Structured output from format functions */
 export interface FormattedOutput {
   text: string;
-  linkMap: Map<number, string>;
+  linkMap: Map<number, DownloadLink>;
 }
 
 export function truncate(text: string, maxLength: number): string {
@@ -23,14 +23,15 @@ function formatSourceDownloadLines(
   sourceGroup: SourceGroup,
   prefix: string,
   counter: { value: number },
-  linkMap: Map<number, string>,
+  linkMap: Map<number, DownloadLink>,
 ): string[] {
   if (sourceGroup.downloadLinks.length > 0) {
     return sourceGroup.downloadLinks.map((link: DownloadLink) => {
       const idx = counter.value;
       counter.value++;
-      linkMap.set(idx, link.url);
-      return `${prefix}[${idx}] ${link.hostName}: \x1b[2m${truncate(link.url, 70)}\x1b[0m`;
+      linkMap.set(idx, link);
+      const icon = link.hostType === 'direct' ? '⬇' : '🌐';
+      return `${prefix}[${idx}] ${icon} ${link.hostName}: \x1b[2m${truncate(link.url, 70)}\x1b[0m`;
     });
   }
   return [];
@@ -48,7 +49,7 @@ function formatSourceDownloadLines(
 function formatEntry(
   entry: MergedEntry,
   counter: { value: number },
-  linkMap: Map<number, string>,
+  linkMap: Map<number, DownloadLink>,
 ): string {
   const heading = `${entry.index}. ${truncate(entry.gameName, 50)}`;
 
@@ -94,7 +95,7 @@ function formatEntry(
 function formatEntries(
   entries: MergedEntry[],
   counter: { value: number },
-  linkMap: Map<number, string>,
+  linkMap: Map<number, DownloadLink>,
 ): string {
   return entries.map(e => formatEntry(e, counter, linkMap)).join('\n\n');
 }
@@ -115,7 +116,7 @@ export function buildSummary(entries: MergedEntry[]): string {
 }
 
 export function formatSearchResults(entries: MergedEntry[], query: string, errors: string[]): FormattedOutput {
-  const linkMap = new Map<number, string>();
+  const linkMap = new Map<number, DownloadLink>();
 
   if (entries.length === 0) {
     const parts: string[] = [`No games found matching '${query}'.`];
@@ -136,7 +137,7 @@ export function formatSearchResults(entries: MergedEntry[], query: string, error
 }
 
 export function formatResults(entries: MergedEntry[], errors: string[]): FormattedOutput {
-  const linkMap = new Map<number, string>();
+  const linkMap = new Map<number, DownloadLink>();
 
   if (entries.length === 0) {
     const parts: string[] = ['No .nsp files were found on any source.'];
@@ -157,7 +158,7 @@ export function formatResults(entries: MergedEntry[], errors: string[]): Formatt
 }
 
 export function formatNewReleases(entries: MergedEntry[], errors: string[]): FormattedOutput {
-  const linkMap = new Map<number, string>();
+  const linkMap = new Map<number, DownloadLink>();
 
   if (entries.length === 0) {
     const parts: string[] = ['No new releases found.'];
@@ -214,7 +215,7 @@ export function formatGameList(entries: MergedEntry[], header: string, errors: s
  * Link numbering starts at 1 for each game.
  */
 export function formatGameLinks(entry: MergedEntry): FormattedOutput {
-  const linkMap = new Map<number, string>();
+  const linkMap = new Map<number, DownloadLink>();
   const counter = { value: 1 };
   const lines: string[] = [
     `${bold(truncate(entry.gameName, 60))}`,
@@ -227,11 +228,12 @@ export function formatGameLinks(entry: MergedEntry): FormattedOutput {
     }
     for (const link of sg.downloadLinks) {
       const idx = counter.value++;
-      linkMap.set(idx, link.url);
+      linkMap.set(idx, link);
+      const icon = link.hostType === 'direct' ? '⬇' : '🌐';
       // Show just the host name and domain — no full URL
       let domain = '';
       try { domain = ` \x1b[2m(${new URL(link.url).hostname})\x1b[0m`; } catch { /* ignore */ }
-      lines.push(`    [${idx}] ${link.hostName}${domain}`);
+      lines.push(`    [${idx}] ${icon} ${link.hostName}${domain}`);
     }
   }
 
