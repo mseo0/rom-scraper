@@ -45,13 +45,13 @@ switper --update            # scan your library, see what's outdated
 
 ## What It Does
 
-- **Search across multiple sources** — queries notUltraNX and NXBrew simultaneously, merges results by game name
-- **Download directly from the terminal** — progress bar with speed and ETA, no browser needed
-- **Post-download options** — after downloading, Switper asks if you want to extract ZIPs and decompress NSZ → NSP (requires [nsz](https://github.com/nicoboss/nsz) for decompression, optional)
-- **Check for updates** — scans your local ROM library, parses filenames, compares against scraped data, tells you what's outdated
-- **Dead link filtering** — validates download links before showing them so you don't waste time on broken links
-- **Fuzzy name matching** — normalizes messy ROM filenames (`Game Name [v1.2.3] [0100ABC012345000] (USA).nsp`) to match against catalog listings
-- **Ignore list** — suppress update notifications for games you don't care about
+- **Search across multiple sources:** queries notUltraNX and NXBrew simultaneously, merges results by game name
+- **Download directly from the terminal:** progress bar with speed and ETA, no browser needed
+- **Post-download options:** after downloading, Switper asks if you want to extract ZIPs and decompress NSZ → NSP (requires [nsz](https://github.com/nicoboss/nsz) for decompression, optional)
+- **Check for updates:** scans your local ROM library, parses filenames, compares against scraped data, tells you what's outdated
+- **Dead link filtering:** validates download links before showing them so you don't waste time on broken links
+- **Fuzzy name matching:** normalizes messy ROM filenames (`Game Name [v1.2.3] [0100ABC012345000] (USA).nsp`) to match against catalog listings
+- **Ignore list:** suppress update notifications for games you don't care about
 
 ## Reliability
 
