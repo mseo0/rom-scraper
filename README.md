@@ -21,11 +21,10 @@ One command to search multiple ROM sources, merge results, download directly wit
 ```bash
 git clone <this repo> && cd switper
 npm install && npm run build && npm install -g .
-switper init          # set up download dir + game library
-switper zelda         # search and download
+switper zelda         # first run auto-launches setup
 ```
 
-That's it. Three commands from zero to downloading.
+That's it. On first run, Switper automatically walks you through setup before searching.
 
 ## Why Switper?
 
@@ -41,7 +40,7 @@ That's it. Three commands from zero to downloading.
 **With Switper:**
 ```bash
 switper zelda              # search → pick → download → done
-switper check-updates      # scan your library, see what's outdated
+switper --update            # scan your library, see what's outdated
 ```
 
 ## What It Does
@@ -180,9 +179,9 @@ switper --ping
 Scan your local ROM library and see which games have newer versions available:
 
 ```bash
-switper init               # first time: set your library directory
-switper check-updates      # compare local ROMs against scraped data
-switper check-updates --refresh   # force a fresh scrape
+switper init               # first time: set your game directory
+switper --update                # compare local ROMs against scraped data
+switper --update --refresh     # force a fresh scrape
 ```
 
 Switper parses your ROM filenames (handles messy names with version tags, title IDs, region codes), normalizes them, and matches against cached scraped data. Results show what you have vs. what's available:
@@ -222,8 +221,8 @@ switper --ignore reset       # clear the ignore list
 | `--new` | Browse recently added games |
 | `--ping` | Check if sources are reachable |
 | `init` | Run interactive setup wizard |
-| `check-updates` | Check your library for available updates |
-| `--refresh` | Force fresh scrape (with `check-updates`) |
+| `--update` | Check your library for available updates |
+| `--refresh` | Force fresh scrape (with `--update`) |
 | `--ignore <name>` | Add a game to the ignore list |
 | `--ignore all` | Suppress all update notifications |
 | `--ignore reset` | Clear the ignore list |
@@ -245,6 +244,8 @@ switper zelda -nv   # one-off skip
 ```
 
 ### Download Directory
+
+Set your game directory to your emulator's ROM folder so downloaded games are immediately available to play. This directory is also used for update checks.
 
 ```bash
 switper -d ~/roms           # saved to ~/.switper.json

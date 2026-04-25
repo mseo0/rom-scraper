@@ -11,7 +11,7 @@ import { MergedEntry } from './types';
 import { DownloadLink } from './fileHosts';
 import { runPingCommand } from './ping';
 import { copyToClipboard } from './clipboard';
-import { readConfig, writeConfig, resolveDownloadDir, getDownloadDir } from './auth';
+import { readConfig, writeConfig, resolveDownloadDir, getDownloadDir, forceLogin } from './auth';
 import { runInit } from './init';
 import { runCheckUpdates } from './updateChecker';
 import { downloadFile } from './downloader';
@@ -35,6 +35,7 @@ export interface CliArgs {
   validateToggle?: 'on' | 'off';
   downloadDir?: string;
   init: boolean;
+  login: boolean;
   checkUpdates: boolean;
   refreshCache: boolean;
   ignoreAction?: {
@@ -59,12 +60,13 @@ export function parseArgs(argv: string[]): CliArgs {
 
   Commands:
     init                             Run interactive setup wizard
-    check-updates                    Check for game updates
+    login                            Re-enter notUltraNX credentials
+    --update                         Check for game updates
     --new                            Browse recently added games
     --ping                           Check if sources are reachable
 
   Update Options:
-    --refresh                        Force a fresh scrape (with check-updates)
+    --refresh                        Force a fresh scrape (with --update)
     --ignore <game_name>             Add a game to the ignore list
     --ignore all                     Suppress all update notifications
     --ignore reset                   Clear the ignore list
@@ -87,9 +89,10 @@ export function parseArgs(argv: string[]): CliArgs {
   const hasNew = args.includes('--new');
   const hasPing = args.includes('--ping');
 
-  // Detect subcommands: init and check-updates (first positional argument)
+  // Detect subcommands: init, login, and check-updates (first positional argument)
   const hasInit = args[0] === 'init';
-  const hasCheckUpdates = args[0] === 'check-updates';
+  const hasLogin = args[0] === 'login';
+  const hasCheckUpdates = args[0] === 'check-updates' || args[0] === 'check-update' || args.includes('--update');
 
   // Detect --refresh flag (only meaningful with check-updates)
   const hasRefresh = args.includes('--refresh');
@@ -171,10 +174,10 @@ export function parseArgs(argv: string[]): CliArgs {
       process.exit(1);
     }
     searchQuery = nextArg;
-  } else if (!hasInit && !hasCheckUpdates) {
+  } else if (!hasInit && !hasCheckUpdates && !hasLogin) {
     // Bare arguments (excluding flags and their values) become the search query
     // Only when not using init or check-updates subcommands
-    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv', '--download-dir', '-d', '--refresh', '--ignore']);
+    const flagArgs = new Set(['--new', '--ping', '-s', '--no-validate', '-nv', '--download-dir', '-d', '--refresh', '--ignore', '--update']);
     const skipIndices = new Set<number>();
     // Mark -nv and its on/off value for skipping
     if (nvIndex !== -1) {
@@ -228,7 +231,7 @@ export function parseArgs(argv: string[]): CliArgs {
 
   // Conflict detection: init and check-updates cannot combine with --search, --new, or each other
   if (hasInit && hasCheckUpdates) {
-    console.error('Error: init and check-updates cannot be used together.');
+    console.error('Error: init and --update cannot be used together.');
     process.exit(1);
   }
 
@@ -238,7 +241,7 @@ export function parseArgs(argv: string[]): CliArgs {
   }
 
   if (hasCheckUpdates && (searchQuery !== null || hasNew)) {
-    console.error('Error: check-updates cannot be combined with --search or --new.');
+    console.error('Error: --update cannot be combined with --search or --new.');
     process.exit(1);
   }
 
@@ -250,6 +253,7 @@ export function parseArgs(argv: string[]): CliArgs {
     validateToggle,
     downloadDir,
     init: hasInit,
+    login: hasLogin,
     checkUpdates: hasCheckUpdates,
     refreshCache: hasRefresh,
     ignoreAction,
@@ -395,30 +399,33 @@ export async function runLinkPrompt(
       if (result.success) {
         progressBar.finish(result.totalBytes, result.filePath);
 
-        // Post-download pipeline: zip extract → nsz decompress → cleanup
         let filesToProcess = [result.filePath];
 
         // Step 1: Extract zip if needed
         if (isZipFile(result.filePath)) {
-          const extractResult = await extractZip(result.filePath);
-          if (extractResult.success) {
-            filesToProcess = extractResult.files;
-            // Trash the zip file
-            try { fs.unlinkSync(result.filePath); } catch { /* ignore */ }
-          } else {
-            console.log(`  Extraction failed: ${extractResult.error}`);
+          const zipAnswer = await prompt('  Extract zip? (Y/n): ');
+          if (!zipAnswer || zipAnswer.toLowerCase() === 'y' || zipAnswer.toLowerCase() === 'yes') {
+            const extractResult = await extractZip(result.filePath);
+            if (extractResult.success) {
+              filesToProcess = extractResult.files;
+              try { fs.unlinkSync(result.filePath); } catch { /* ignore */ }
+            } else {
+              console.log(`  Extraction failed: ${extractResult.error}`);
+            }
           }
         }
 
         // Step 2: Decompress any .nsz files found
         for (const file of filesToProcess) {
           if (isNszFile(file)) {
-            const decompressResult = await decompressNsz(file);
-            if (decompressResult.success) {
-              // Trash the .nsz file after successful decompression
-              try { fs.unlinkSync(file); } catch { /* ignore */ }
-            } else {
-              console.log(`  ${decompressResult.error}`);
+            const nszAnswer = await prompt('  Decompress NSZ → NSP? (Y/n): ');
+            if (!nszAnswer || nszAnswer.toLowerCase() === 'y' || nszAnswer.toLowerCase() === 'yes') {
+              const decompressResult = await decompressNsz(file);
+              if (decompressResult.success) {
+                try { fs.unlinkSync(file); } catch { /* ignore */ }
+              } else {
+                console.log(`  ${decompressResult.error}`);
+              }
             }
           }
         }
@@ -515,7 +522,7 @@ async function runNewReleases(noValidate: boolean = false): Promise<void> {
 async function main(): Promise<void> {
   const {
     searchQuery, newReleases, ping, noValidate, validateToggle,
-    downloadDir, init, checkUpdates, refreshCache, ignoreAction,
+    downloadDir, init, login, checkUpdates, refreshCache, ignoreAction,
   } = parseArgs(process.argv);
 
   // Handle persistent toggle: switper -nv on / switper -nv off
@@ -532,6 +539,19 @@ async function main(): Promise<void> {
   if (init) {
     await runInit();
     return;
+  }
+
+  // Route: switper login
+  if (login) {
+    await forceLogin();
+    return;
+  }
+
+  // First-run detection: if no config exists, run init automatically
+  const firstRunConfig = readConfig();
+  if (!firstRunConfig.downloadDir && !firstRunConfig.ultranx && !init) {
+    console.log('\x1b[33m  First time? Let\'s set up Switper.\x1b[0m');
+    await runInit();
   }
 
   // Route: switper check-updates [--refresh]
@@ -586,13 +606,14 @@ async function main(): Promise<void> {
     }
   }
 
-  // Handle --download-dir: resolve, save to config, print confirmation, then continue
+  // Handle --download-dir: resolve, save to config (both downloadDir and libraryDir), print confirmation
   if (downloadDir) {
     const resolved = resolveDownloadDir(downloadDir);
     const config = readConfig();
     config.downloadDir = resolved;
+    config.libraryDir = resolved;
     writeConfig(config);
-    console.log(`Download directory set to: ${resolved}`);
+    console.log(`Game directory set to: ${resolved}`);
   }
 
   // Validate that the effective download directory is writable

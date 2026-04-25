@@ -161,3 +161,41 @@ export async function getUltraNXToken(): Promise<string | null> {
   cachedToken = token;
   return token;
 }
+
+/**
+ * Force re-entry of notUltraNX credentials.
+ * Clears cached token and saved credentials, then prompts for new ones.
+ */
+export async function forceLogin(): Promise<void> {
+  cachedToken = null;
+
+  console.log('');
+  console.log('\x1b[36m  Enter your notUltraNX credentials.\x1b[0m');
+  console.log('\x1b[2m  Credentials saved to ~/.switper.json (chmod 600)\x1b[0m');
+  console.log('');
+
+  const username = await askQuestion('\x1b[36m  Username: \x1b[0m');
+  if (!username) {
+    console.log('\x1b[31m  Cancelled.\x1b[0m');
+    return;
+  }
+
+  const password = await askQuestion('\x1b[36m  Password: \x1b[0m');
+  if (!password) {
+    console.log('\x1b[31m  Cancelled.\x1b[0m');
+    return;
+  }
+
+  const token = await loginUltraNX(username, password);
+  if (!token) {
+    console.log('\x1b[31m  Login failed. Check your credentials.\x1b[0m');
+    return;
+  }
+
+  const config = readConfig();
+  config.ultranx = { username, password };
+  writeConfig(config);
+  cachedToken = token;
+  console.log('\x1b[32m  Logged in and credentials saved.\x1b[0m');
+  console.log('');
+}

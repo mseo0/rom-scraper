@@ -4,7 +4,6 @@ import { readConfig, writeConfig, resolveDownloadDir } from './auth';
 
 // ANSI color helpers
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
-const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -29,10 +28,10 @@ function defaultPromptFn(question: string): Promise<string> {
 }
 
 /**
- * Validate that a download directory exists or can be created, and is writable.
+ * Validate that a directory exists or can be created, and is writable.
  * Returns null on success, or an error message string on failure.
  */
-function validateDownloadDir(dirPath: string): string | null {
+function validateDirectory(dirPath: string): string | null {
   try {
     fs.mkdirSync(dirPath, { recursive: true });
   } catch {
@@ -47,30 +46,9 @@ function validateDownloadDir(dirPath: string): string | null {
 }
 
 /**
- * Validate that a game library directory exists and is readable.
- * Returns null on success, or an error message string on failure.
- */
-function validateLibraryDir(dirPath: string): string | null {
-  try {
-    fs.accessSync(dirPath, fs.constants.R_OK);
-  } catch {
-    return `Directory does not exist or is not readable: ${dirPath}`;
-  }
-  try {
-    const stat = fs.statSync(dirPath);
-    if (!stat.isDirectory()) {
-      return `Path is not a directory: ${dirPath}`;
-    }
-  } catch {
-    return `Cannot read directory: ${dirPath}`;
-  }
-  return null;
-}
-
-/**
  * Run the interactive setup wizard.
- * Prompts for download directory and game library directory.
- * Validates paths and persists to config.
+ * Prompts for a game directory that is used for both downloads and library scanning.
+ * Validates the path and persists to config.
  */
 export async function runInit(options?: InitOptions): Promise<void> {
   const ask = options?.promptFn ?? defaultPromptFn;
@@ -81,55 +59,32 @@ export async function runInit(options?: InitOptions): Promise<void> {
   console.log(dim('  Configure your settings'));
   console.log('');
 
-  // --- Download directory ---
-  const downloadDefault = (config.downloadDir as string) || process.cwd();
-  let downloadDir: string | undefined;
+  // --- Game directory (used for both downloads and library scanning) ---
+  const currentDir = (config.downloadDir as string) || (config.libraryDir as string) || process.cwd();
+  let gameDir: string | undefined;
 
-  while (!downloadDir) {
-    const answer = await ask(green(`  Download directory`) + dim(` (${downloadDefault})`) + green(': '));
-    const raw = answer || downloadDefault;
+  while (!gameDir) {
+    const answer = await ask(green(`  Game directory`) + dim(` (${currentDir})`) + green(': '));
+    const raw = answer || currentDir;
     const resolved = resolveDownloadDir(raw);
-    const error = validateDownloadDir(resolved);
+    const error = validateDirectory(resolved);
     if (error) {
       console.log(red(`  ${error}`));
     } else {
-      downloadDir = resolved;
+      gameDir = resolved;
     }
   }
 
-  // --- Game library directory ---
-  const libraryDefault = (config.libraryDir as string) || '';
-  let libraryDir: string | undefined;
-
-  while (!libraryDir) {
-    const defaultHint = libraryDefault ? dim(` (${libraryDefault})`) : '';
-    const answer = await ask(green(`  Game library directory`) + defaultHint + green(': '));
-    const raw = answer || libraryDefault;
-
-    if (!raw) {
-      console.log(red('  A game library directory is required.'));
-      continue;
-    }
-
-    const resolved = resolveDownloadDir(raw);
-    const error = validateLibraryDir(resolved);
-    if (error) {
-      console.log(red(`  ${error}`));
-    } else {
-      libraryDir = resolved;
-    }
-  }
-
-  // --- Persist settings ---
-  config.downloadDir = downloadDir;
-  config.libraryDir = libraryDir;
+  // --- Persist settings (same directory for both) ---
+  config.downloadDir = gameDir;
+  config.libraryDir = gameDir;
   writeConfig(config as any);
 
   // --- Confirmation summary ---
   console.log('');
   console.log(green('  Settings saved!'));
   console.log('');
-  console.log(`  Download directory:     ${bold(downloadDir)}`);
-  console.log(`  Game library directory: ${bold(libraryDir)}`);
+  console.log(`  Game directory: ${bold(gameDir)}`);
+  console.log(dim('  Downloads and update checks will use this directory.'));
   console.log('');
 }
