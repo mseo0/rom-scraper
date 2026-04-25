@@ -117,16 +117,11 @@ rom-scraper --new
 ```
 New Releases — 3 game(s) found:
 
-1. The Legend of Zelda: Echoes of Wisdom
-   Source: notUltraNX
-   Downloads:
-  [1] Base Game: https://...
-  [2] Full Pack: https://...
+  1. The Legend of Zelda: Echoes of Wisdom (notUltraNX) [4 links]
+  2. Super Mario Odyssey (notUltraNX) [3 links]
+  3. Metroid Dread (notUltraNX, NXBrew) [5 links]
 
-2. Super Mario Odyssey
-   Source: notUltraNX
-   Downloads:
-  [3] Base Game: https://...
+  Select game #:
 ```
 
 ### Ping Sources
@@ -145,38 +140,35 @@ rom-scraper --ping
 
 ### Output Format
 
-Each result shows the game name, source, and numbered download links:
+Search results show a compact game list. Pick a game by number to see its download links:
 
 ```
-Found 2 result(s) for 'zelda':
+Found 3 result(s) for 'zelda':
 
-1. The Legend of Zelda: Echoes of Wisdom
-   Source: notUltraNX
-   Downloads:
-  [1] Base Game: https://api.ultranx.ru/games/download/.../base
-  [2] Full Pack: https://api.ultranx.ru/games/download/.../full
+  1. The Legend of Zelda: Echoes of Wisdom (notUltraNX) [4 links]
+  2. The Legend of Zelda: Tears of the Kingdom (notUltraNX, NXBrew) [5 links]
+  3. The Legend of Zelda: Skyward Sword HD (notUltraNX) [3 links]
 
-2. The Legend of Zelda: Tears of the Kingdom
-   Source: notUltraNX
-   Downloads:
-  [3] Base Game: https://api.ultranx.ru/games/download/.../base
-  [4] Update:    https://api.ultranx.ru/games/download/.../update
-  [5] Full Pack: https://api.ultranx.ru/games/download/.../full
-
-Copy link #:
+  Select game #: 2
 ```
 
-After results are displayed, a `Copy link #:` prompt appears. Type a link number to copy its URL to your clipboard:
+After selecting a game, its download links are shown with numbered entries:
 
 ```
-Copy link #: 2
-Copied [2]: https://api.ultranx.ru/games/download/.../full
-Copy link #:
+The Legend of Zelda: Tears of the Kingdom
+
+  notUltraNX
+    [1] Base Game (downloader.disk.yandex.ru)
+    [2] Update (downloader.disk.yandex.ru)
+    [3] Full Pack (downloader.disk.yandex.ru)
+  NXBrew
+    [4] 1fichier (1fichier.com)
+
+  Copy link #: 1
+  Copied [1]: https://downloader.disk.yandex.ru/disk/...
 ```
 
-You can copy multiple links in a row. Type `q`, `quit`, `exit`, or press Enter to leave the prompt and return to search (interactive mode) or exit (direct mode).
-
-Results are displayed on an alternate screen buffer — when you leave the results (exit the clipboard prompt or press Ctrl+C), the terminal restores to its previous state with no leftover output.
+You can copy multiple links in a row. Type `q` or press Enter to go back to the game list.
 
 Download labels:
 - **Base Game** — the main game file
